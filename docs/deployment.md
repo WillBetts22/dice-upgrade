@@ -21,6 +21,10 @@ railway domain --service web
 
 Railway builds with `npm ci && npm run build` and starts with `npm start`, as set in `railway.json`. It sets `PORT` automatically. The health check is `GET /healthz`, which returns `{"ok":true,"db":"postgres"}`.
 
+The current deployment is the `dice-upgrade` Railway project, with services `web` and `Postgres`, at https://web-production-3b3d3.up.railway.app. It was deployed from this folder with `railway up`. To redeploy after a change, run `railway up --service web`, or connect the GitHub repo to the `web` service in the Railway dashboard to deploy on every push.
+
+Railway now marks `railway.json` (config as code) as deprecated in favor of `.railway/railway.ts`. Existing files keep working until 2026-12-01. Run `railway config migrate` before then.
+
 A redeploy restarts the process. Games in progress survive: rooms reload from Postgres and overdue phases finish exactly once. Players' browsers reconnect automatically. Avoid redeploying in the middle of an event anyway, because each player sees a few seconds of "Reconnecting".
 
 ## Docker or a VM

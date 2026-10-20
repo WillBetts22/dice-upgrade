@@ -2,6 +2,8 @@
 
 A live multiplayer browser game for 20 to 30 players. A host opens a room, everyone joins from their phone with a short code, and players trade dice upgrades in a real bid/ask market before rolling. You can sell upgrades you do not own, but uncovered shorts are charged at the round's highest traded price.
 
+**Live:** https://web-production-3b3d3.up.railway.app
+
 Everything is server-authoritative: one Node process owns matching, timers, inventory, cash, dice and scoring, and persists every change to Postgres in a transaction. Browsers only send commands and render snapshots.
 
 - [Rules of the game](#rules-of-the-game)
