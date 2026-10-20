@@ -1,0 +1,871 @@
+{
+  "catalogVersion": "v1",
+  "base": {
+    "equipment": [],
+    "mean": 87.49999999999991,
+    "variance": 364.5833333333338,
+    "sd": 19.094065395649345,
+    "min": 25,
+    "max": 150,
+    "p50": 85,
+    "p90": 110,
+    "p99": 130,
+    "pAtLeast150": 0.0001286008230452675,
+    "maxDiceUsed": 5,
+    "outcomes": 7776
+  },
+  "singles": [
+    {
+      "equipment": [
+        "extra_die"
+      ],
+      "mean": 105.0000000000025,
+      "variance": 437.4999999999958,
+      "sd": 20.916500663351787,
+      "min": 30,
+      "max": 180,
+      "p50": 105,
+      "p90": 130,
+      "p99": 150,
+      "pAtLeast150": 0.019675925925925947,
+      "maxDiceUsed": 6,
+      "outcomes": 46656,
+      "increment": 17.500000000002586
+    },
+    {
+      "equipment": [
+        "second_chance"
+      ],
+      "mean": 102.96199845677383,
+      "variance": 327.39715413374614,
+      "sd": 18.0941193246244,
+      "min": 25,
+      "max": 150,
+      "p50": 105,
+      "p90": 125,
+      "p99": 140,
+      "pAtLeast150": 0.0007716049382716053,
+      "maxDiceUsed": 5,
+      "outcomes": 234981,
+      "increment": 15.461998456773912
+    },
+    {
+      "equipment": [
+        "loaded_dice"
+      ],
+      "mean": 104.1666666666662,
+      "variance": 225.69444444444446,
+      "sd": 15.023130314433288,
+      "min": 50,
+      "max": 150,
+      "p50": 105,
+      "p90": 125,
+      "p99": 135,
+      "pAtLeast150": 0.0001286008230452675,
+      "maxDiceUsed": 5,
+      "outcomes": 7776,
+      "increment": 16.666666666666288
+    },
+    {
+      "equipment": [
+        "six_hunter"
+      ],
+      "mean": 104.16666666666706,
+      "variance": 1059.0277777777783,
+      "sd": 32.5427069829444,
+      "min": 25,
+      "max": 250,
+      "p50": 100,
+      "p90": 150,
+      "p99": 190,
+      "pAtLeast150": 0.10429526748971178,
+      "maxDiceUsed": 5,
+      "outcomes": 7776,
+      "increment": 16.66666666666714
+    },
+    {
+      "equipment": [
+        "jackpot"
+      ],
+      "mean": 104.18081275720164,
+      "variance": 2187.3947758826325,
+      "sd": 46.76959242801494,
+      "min": 25,
+      "max": 235,
+      "p50": 90,
+      "p90": 190,
+      "p99": 215,
+      "pAtLeast150": 0.19624485596707777,
+      "maxDiceUsed": 5,
+      "outcomes": 7776,
+      "increment": 16.68081275720172
+    },
+    {
+      "equipment": [
+        "safety_net"
+      ],
+      "mean": 102.94817386830563,
+      "variance": 46.269047591168366,
+      "sd": 6.802135516965857,
+      "min": 100,
+      "max": 150,
+      "p50": 100,
+      "p90": 110,
+      "p99": 130,
+      "pAtLeast150": 0.0001286008230452675,
+      "maxDiceUsed": 5,
+      "outcomes": 7776,
+      "increment": 15.448173868305716
+    }
+  ],
+  "pairs": [
+    {
+      "equipment": [
+        "extra_die",
+        "second_chance"
+      ],
+      "mean": 122.13434499286406,
+      "variance": 405.95045493757436,
+      "sd": 20.14821220201868,
+      "min": 30,
+      "max": 180,
+      "p50": 125,
+      "p90": 150,
+      "p99": 165,
+      "pAtLeast150": 0.10399936652184644,
+      "maxDiceUsed": 6,
+      "outcomes": 1522881,
+      "increment": 34.63434499286414,
+      "synergy": 1.6723465360876446,
+      "atLeastSingles": true
+    },
+    {
+      "equipment": [
+        "extra_die",
+        "loaded_dice"
+      ],
+      "mean": 125.00000000000762,
+      "variance": 270.833333333334,
+      "sd": 16.4570147151096,
+      "min": 60,
+      "max": 180,
+      "p50": 125,
+      "p90": 145,
+      "p99": 160,
+      "pAtLeast150": 0.08395490397805061,
+      "maxDiceUsed": 6,
+      "outcomes": 46656,
+      "increment": 37.5000000000077,
+      "synergy": 3.333333333338828,
+      "atLeastSingles": true
+    },
+    {
+      "equipment": [
+        "extra_die",
+        "six_hunter"
+      ],
+      "mean": 124.99999999999737,
+      "variance": 1270.8333333333173,
+      "sd": 35.64874939367884,
+      "min": 30,
+      "max": 300,
+      "p50": 120,
+      "p90": 170,
+      "p99": 215,
+      "pAtLeast150": 0.25578703703703304,
+      "maxDiceUsed": 6,
+      "outcomes": 46656,
+      "increment": 37.499999999997456,
+      "synergy": 3.3333333333277295,
+      "atLeastSingles": true
+    },
+    {
+      "equipment": [
+        "extra_die",
+        "jackpot"
+      ],
+      "mean": 127.37407836076734,
+      "variance": 2692.6871187064476,
+      "sd": 51.891108281732116,
+      "min": 30,
+      "max": 265,
+      "p50": 105,
+      "p90": 215,
+      "p99": 235,
+      "pAtLeast150": 0.26401748971192984,
+      "maxDiceUsed": 6,
+      "outcomes": 46656,
+      "increment": 39.87407836076743,
+      "synergy": 5.69326560356312,
+      "atLeastSingles": true
+    },
+    {
+      "equipment": [
+        "extra_die",
+        "safety_net"
+      ],
+      "mean": 111.1136831275636,
+      "variance": 192.71225618764402,
+      "sd": 13.88208400016525,
+      "min": 100,
+      "max": 180,
+      "p50": 105,
+      "p90": 130,
+      "p99": 150,
+      "pAtLeast150": 0.019675925925925947,
+      "maxDiceUsed": 6,
+      "outcomes": 46656,
+      "increment": 23.61368312756369,
+      "synergy": -9.334490740744613,
+      "atLeastSingles": true
+    },
+    {
+      "equipment": [
+        "second_chance",
+        "loaded_dice"
+      ],
+      "mean": 116.3483796296242,
+      "variance": 163.7657915559278,
+      "sd": 12.797100904342663,
+      "min": 50,
+      "max": 150,
+      "p50": 120,
+      "p90": 130,
+      "p99": 140,
+      "pAtLeast150": 0.00048582533150434395,
+      "maxDiceUsed": 5,
+      "outcomes": 167296,
+      "increment": 28.84837962962429,
+      "synergy": -3.28028549381591,
+      "atLeastSingles": true
+    },
+    {
+      "equipment": [
+        "second_chance",
+        "six_hunter"
+      ],
+      "mean": 125.56616512346815,
+      "variance": 1160.0880861682542,
+      "sd": 34.06006585678093,
+      "min": 25,
+      "max": 250,
+      "p50": 125,
+      "p90": 170,
+      "p99": 215,
+      "pAtLeast150": 0.2589913408779241,
+      "maxDiceUsed": 5,
+      "outcomes": 234981,
+      "increment": 38.06616512346824,
+      "synergy": 5.937500000027185,
+      "atLeastSingles": true
+    },
+    {
+      "equipment": [
+        "second_chance",
+        "jackpot"
+      ],
+      "mean": 129.95081018518763,
+      "variance": 2717.872737541014,
+      "sd": 52.13322105472684,
+      "min": 25,
+      "max": 235,
+      "p50": 105,
+      "p90": 210,
+      "p99": 225,
+      "pAtLeast150": 0.31751543209878413,
+      "maxDiceUsed": 5,
+      "outcomes": 234981,
+      "increment": 42.45081018518772,
+      "synergy": 10.307998971212086,
+      "atLeastSingles": true
+    },
+    {
+      "equipment": [
+        "second_chance",
+        "safety_net"
+      ],
+      "mean": 108.90624999989258,
+      "variance": 121.83504667130475,
+      "sd": 11.03789140512375,
+      "min": 100,
+      "max": 150,
+      "p50": 105,
+      "p90": 125,
+      "p99": 140,
+      "pAtLeast150": 0.0007716049382716053,
+      "maxDiceUsed": 5,
+      "outcomes": 234981,
+      "increment": 21.406249999892665,
+      "synergy": -9.503922325186963,
+      "atLeastSingles": true
+    },
+    {
+      "equipment": [
+        "loaded_dice",
+        "six_hunter"
+      ],
+      "mean": 120.83333333333388,
+      "variance": 809.0277777777789,
+      "sd": 28.44341360979337,
+      "min": 50,
+      "max": 250,
+      "p50": 120,
+      "p90": 160,
+      "p99": 195,
+      "pAtLeast150": 0.1769547325102877,
+      "maxDiceUsed": 5,
+      "outcomes": 7776,
+      "increment": 33.33333333333397,
+      "synergy": 5.400124791776761e-13,
+      "atLeastSingles": true
+    },
+    {
+      "equipment": [
+        "loaded_dice",
+        "jackpot"
+      ],
+      "mean": 120.84747942386801,
+      "variance": 1866.3213876796146,
+      "sd": 43.200941976762664,
+      "min": 50,
+      "max": 235,
+      "p50": 105,
+      "p90": 205,
+      "p99": 220,
+      "pAtLeast150": 0.19624485596707783,
+      "maxDiceUsed": 5,
+      "outcomes": 7776,
+      "increment": 33.347479423868094,
+      "synergy": 8.526512829121202e-14,
+      "atLeastSingles": true
+    },
+    {
+      "equipment": [
+        "loaded_dice",
+        "safety_net"
+      ],
+      "mean": 108.34940843621601,
+      "variance": 98.83483246898398,
+      "sd": 9.94157092561251,
+      "min": 100,
+      "max": 150,
+      "p50": 105,
+      "p90": 125,
+      "p99": 135,
+      "pAtLeast150": 0.0001286008230452675,
+      "maxDiceUsed": 5,
+      "outcomes": 7776,
+      "increment": 20.849408436216095,
+      "synergy": -11.265432098755909,
+      "atLeastSingles": true
+    },
+    {
+      "equipment": [
+        "six_hunter",
+        "jackpot"
+      ],
+      "mean": 120.84747942386862,
+      "variance": 3792.7617168977254,
+      "sd": 61.58540181648347,
+      "min": 25,
+      "max": 335,
+      "p50": 100,
+      "p90": 235,
+      "p99": 275,
+      "pAtLeast150": 0.1968878600823041,
+      "maxDiceUsed": 5,
+      "outcomes": 7776,
+      "increment": 33.347479423868705,
+      "synergy": -1.5631940186722204e-13,
+      "atLeastSingles": true
+    },
+    {
+      "equipment": [
+        "six_hunter",
+        "safety_net"
+      ],
+      "mean": 119.61484053498293,
+      "variance": 454.42662646634756,
+      "sd": 21.317284687932176,
+      "min": 100,
+      "max": 250,
+      "p50": 120,
+      "p90": 150,
+      "p99": 190,
+      "pAtLeast150": 0.10429526748971178,
+      "maxDiceUsed": 5,
+      "outcomes": 7776,
+      "increment": 32.11484053498302,
+      "synergy": 1.0160761121369433e-11,
+      "atLeastSingles": true
+    },
+    {
+      "equipment": [
+        "jackpot",
+        "safety_net"
+      ],
+      "mean": 119.6289866255097,
+      "variance": 1430.221788376346,
+      "sd": 37.818273207225445,
+      "min": 100,
+      "max": 235,
+      "p50": 100,
+      "p90": 190,
+      "p99": 215,
+      "pAtLeast150": 0.19624485596707827,
+      "maxDiceUsed": 5,
+      "outcomes": 7776,
+      "increment": 32.12898662550978,
+      "synergy": 2.3447910280083306e-12,
+      "atLeastSingles": true
+    }
+  ],
+  "standaloneSpread": 2.0518261316968704,
+  "checks": [
+    {
+      "name": "standalone extra_die in [14, 19]",
+      "pass": true,
+      "detail": "17.5000"
+    },
+    {
+      "name": "catalog value for extra_die matches enumeration",
+      "pass": true,
+      "detail": "17.5 vs 17.5000"
+    },
+    {
+      "name": "standalone second_chance in [14, 19]",
+      "pass": true,
+      "detail": "15.4620"
+    },
+    {
+      "name": "catalog value for second_chance matches enumeration",
+      "pass": true,
+      "detail": "15.462 vs 15.4620"
+    },
+    {
+      "name": "standalone loaded_dice in [14, 19]",
+      "pass": true,
+      "detail": "16.6667"
+    },
+    {
+      "name": "catalog value for loaded_dice matches enumeration",
+      "pass": true,
+      "detail": "16.6667 vs 16.6667"
+    },
+    {
+      "name": "standalone six_hunter in [14, 19]",
+      "pass": true,
+      "detail": "16.6667"
+    },
+    {
+      "name": "catalog value for six_hunter matches enumeration",
+      "pass": true,
+      "detail": "16.6667 vs 16.6667"
+    },
+    {
+      "name": "standalone jackpot in [14, 19]",
+      "pass": true,
+      "detail": "16.6808"
+    },
+    {
+      "name": "catalog value for jackpot matches enumeration",
+      "pass": true,
+      "detail": "16.6808 vs 16.6808"
+    },
+    {
+      "name": "standalone safety_net in [14, 19]",
+      "pass": true,
+      "detail": "15.4482"
+    },
+    {
+      "name": "catalog value for safety_net matches enumeration",
+      "pass": true,
+      "detail": "15.4482 vs 15.4482"
+    },
+    {
+      "name": "standalone spread <= 3",
+      "pass": true,
+      "detail": "2.0518"
+    },
+    {
+      "name": "pair extra_die+second_chance increment <= 45",
+      "pass": true,
+      "detail": "34.6343"
+    },
+    {
+      "name": "pair extra_die+second_chance >= each single",
+      "pass": true,
+      "detail": "122.1343"
+    },
+    {
+      "name": "pair extra_die+loaded_dice increment <= 45",
+      "pass": true,
+      "detail": "37.5000"
+    },
+    {
+      "name": "pair extra_die+loaded_dice >= each single",
+      "pass": true,
+      "detail": "125.0000"
+    },
+    {
+      "name": "pair extra_die+six_hunter increment <= 45",
+      "pass": true,
+      "detail": "37.5000"
+    },
+    {
+      "name": "pair extra_die+six_hunter >= each single",
+      "pass": true,
+      "detail": "125.0000"
+    },
+    {
+      "name": "pair extra_die+jackpot increment <= 45",
+      "pass": true,
+      "detail": "39.8741"
+    },
+    {
+      "name": "pair extra_die+jackpot >= each single",
+      "pass": true,
+      "detail": "127.3741"
+    },
+    {
+      "name": "pair extra_die+safety_net increment <= 45",
+      "pass": true,
+      "detail": "23.6137"
+    },
+    {
+      "name": "pair extra_die+safety_net >= each single",
+      "pass": true,
+      "detail": "111.1137"
+    },
+    {
+      "name": "pair second_chance+loaded_dice increment <= 45",
+      "pass": true,
+      "detail": "28.8484"
+    },
+    {
+      "name": "pair second_chance+loaded_dice >= each single",
+      "pass": true,
+      "detail": "116.3484"
+    },
+    {
+      "name": "pair second_chance+six_hunter increment <= 45",
+      "pass": true,
+      "detail": "38.0662"
+    },
+    {
+      "name": "pair second_chance+six_hunter >= each single",
+      "pass": true,
+      "detail": "125.5662"
+    },
+    {
+      "name": "pair second_chance+jackpot increment <= 45",
+      "pass": true,
+      "detail": "42.4508"
+    },
+    {
+      "name": "pair second_chance+jackpot >= each single",
+      "pass": true,
+      "detail": "129.9508"
+    },
+    {
+      "name": "pair second_chance+safety_net increment <= 45",
+      "pass": true,
+      "detail": "21.4062"
+    },
+    {
+      "name": "pair second_chance+safety_net >= each single",
+      "pass": true,
+      "detail": "108.9062"
+    },
+    {
+      "name": "pair loaded_dice+six_hunter increment <= 45",
+      "pass": true,
+      "detail": "33.3333"
+    },
+    {
+      "name": "pair loaded_dice+six_hunter >= each single",
+      "pass": true,
+      "detail": "120.8333"
+    },
+    {
+      "name": "pair loaded_dice+jackpot increment <= 45",
+      "pass": true,
+      "detail": "33.3475"
+    },
+    {
+      "name": "pair loaded_dice+jackpot >= each single",
+      "pass": true,
+      "detail": "120.8475"
+    },
+    {
+      "name": "pair loaded_dice+safety_net increment <= 45",
+      "pass": true,
+      "detail": "20.8494"
+    },
+    {
+      "name": "pair loaded_dice+safety_net >= each single",
+      "pass": true,
+      "detail": "108.3494"
+    },
+    {
+      "name": "pair six_hunter+jackpot increment <= 45",
+      "pass": true,
+      "detail": "33.3475"
+    },
+    {
+      "name": "pair six_hunter+jackpot >= each single",
+      "pass": true,
+      "detail": "120.8475"
+    },
+    {
+      "name": "pair six_hunter+safety_net increment <= 45",
+      "pass": true,
+      "detail": "32.1148"
+    },
+    {
+      "name": "pair six_hunter+safety_net >= each single",
+      "pass": true,
+      "detail": "119.6148"
+    },
+    {
+      "name": "pair jackpot+safety_net increment <= 45",
+      "pass": true,
+      "detail": "32.1290"
+    },
+    {
+      "name": "pair jackpot+safety_net >= each single",
+      "pass": true,
+      "detail": "119.6290"
+    },
+    {
+      "name": "none uses at most 6 dice and terminates",
+      "pass": true,
+      "detail": "5 dice, max 150"
+    },
+    {
+      "name": "extra_die uses at most 6 dice and terminates",
+      "pass": true,
+      "detail": "6 dice, max 180"
+    },
+    {
+      "name": "second_chance uses at most 6 dice and terminates",
+      "pass": true,
+      "detail": "5 dice, max 150"
+    },
+    {
+      "name": "loaded_dice uses at most 6 dice and terminates",
+      "pass": true,
+      "detail": "5 dice, max 150"
+    },
+    {
+      "name": "six_hunter uses at most 6 dice and terminates",
+      "pass": true,
+      "detail": "5 dice, max 250"
+    },
+    {
+      "name": "jackpot uses at most 6 dice and terminates",
+      "pass": true,
+      "detail": "5 dice, max 235"
+    },
+    {
+      "name": "safety_net uses at most 6 dice and terminates",
+      "pass": true,
+      "detail": "5 dice, max 150"
+    },
+    {
+      "name": "extra_die+second_chance uses at most 6 dice and terminates",
+      "pass": true,
+      "detail": "6 dice, max 180"
+    },
+    {
+      "name": "extra_die+loaded_dice uses at most 6 dice and terminates",
+      "pass": true,
+      "detail": "6 dice, max 180"
+    },
+    {
+      "name": "extra_die+six_hunter uses at most 6 dice and terminates",
+      "pass": true,
+      "detail": "6 dice, max 300"
+    },
+    {
+      "name": "extra_die+jackpot uses at most 6 dice and terminates",
+      "pass": true,
+      "detail": "6 dice, max 265"
+    },
+    {
+      "name": "extra_die+safety_net uses at most 6 dice and terminates",
+      "pass": true,
+      "detail": "6 dice, max 180"
+    },
+    {
+      "name": "second_chance+loaded_dice uses at most 6 dice and terminates",
+      "pass": true,
+      "detail": "5 dice, max 150"
+    },
+    {
+      "name": "second_chance+six_hunter uses at most 6 dice and terminates",
+      "pass": true,
+      "detail": "5 dice, max 250"
+    },
+    {
+      "name": "second_chance+jackpot uses at most 6 dice and terminates",
+      "pass": true,
+      "detail": "5 dice, max 235"
+    },
+    {
+      "name": "second_chance+safety_net uses at most 6 dice and terminates",
+      "pass": true,
+      "detail": "5 dice, max 150"
+    },
+    {
+      "name": "loaded_dice+six_hunter uses at most 6 dice and terminates",
+      "pass": true,
+      "detail": "5 dice, max 250"
+    },
+    {
+      "name": "loaded_dice+jackpot uses at most 6 dice and terminates",
+      "pass": true,
+      "detail": "5 dice, max 235"
+    },
+    {
+      "name": "loaded_dice+safety_net uses at most 6 dice and terminates",
+      "pass": true,
+      "detail": "5 dice, max 150"
+    },
+    {
+      "name": "six_hunter+jackpot uses at most 6 dice and terminates",
+      "pass": true,
+      "detail": "5 dice, max 335"
+    },
+    {
+      "name": "six_hunter+safety_net uses at most 6 dice and terminates",
+      "pass": true,
+      "detail": "5 dice, max 250"
+    },
+    {
+      "name": "jackpot+safety_net uses at most 6 dice and terminates",
+      "pass": true,
+      "detail": "5 dice, max 235"
+    },
+    {
+      "name": "pool version v1-all15: every pair in every pool passes",
+      "pass": true,
+      "detail": "15 pools"
+    },
+    {
+      "name": "deal schedules for 2-30 players x 1-6 rounds stay within 3 coins",
+      "pass": true,
+      "detail": "worst cumulative spread 2.0518; fallback schedule verified: true"
+    }
+  ],
+  "schedule": {
+    "rosterSizes": [
+      2,
+      30
+    ],
+    "rounds": 6,
+    "trials": 20,
+    "worstSpread": 2.0518,
+    "fallbackUses": 0,
+    "fallbackChecked": true,
+    "pass": true
+  },
+  "pools": [
+    {
+      "version": "v1-all15",
+      "pools": [
+        [
+          "extra_die",
+          "second_chance",
+          "loaded_dice",
+          "six_hunter"
+        ],
+        [
+          "extra_die",
+          "second_chance",
+          "loaded_dice",
+          "jackpot"
+        ],
+        [
+          "extra_die",
+          "second_chance",
+          "loaded_dice",
+          "safety_net"
+        ],
+        [
+          "extra_die",
+          "second_chance",
+          "six_hunter",
+          "jackpot"
+        ],
+        [
+          "extra_die",
+          "second_chance",
+          "six_hunter",
+          "safety_net"
+        ],
+        [
+          "extra_die",
+          "second_chance",
+          "jackpot",
+          "safety_net"
+        ],
+        [
+          "extra_die",
+          "loaded_dice",
+          "six_hunter",
+          "jackpot"
+        ],
+        [
+          "extra_die",
+          "loaded_dice",
+          "six_hunter",
+          "safety_net"
+        ],
+        [
+          "extra_die",
+          "loaded_dice",
+          "jackpot",
+          "safety_net"
+        ],
+        [
+          "extra_die",
+          "six_hunter",
+          "jackpot",
+          "safety_net"
+        ],
+        [
+          "second_chance",
+          "loaded_dice",
+          "six_hunter",
+          "jackpot"
+        ],
+        [
+          "second_chance",
+          "loaded_dice",
+          "six_hunter",
+          "safety_net"
+        ],
+        [
+          "second_chance",
+          "loaded_dice",
+          "jackpot",
+          "safety_net"
+        ],
+        [
+          "second_chance",
+          "six_hunter",
+          "jackpot",
+          "safety_net"
+        ],
+        [
+          "loaded_dice",
+          "six_hunter",
+          "jackpot",
+          "safety_net"
+        ]
+      ],
+      "allPairsPass": true
+    }
+  ]
+}
