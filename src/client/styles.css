@@ -145,7 +145,7 @@ th { font-size: 0.8rem; color: var(--muted); font-weight: 600; }
 .die { width: 52px; height: 52px; border-radius: 10px; background: var(--surface); border: 2px solid var(--text); display: grid; place-items: center; font-size: 1.6rem; font-weight: 800; font-variant-numeric: tabular-nums; position: relative; }
 .die.rerolled { border-color: var(--accent); }
 .die.six { background: var(--buy-bg); }
-.die .tag { position: absolute; bottom: -18px; font-size: 0.65rem; color: var(--muted); font-weight: 600; white-space: nowrap; }
+.die .tag { position: absolute; top: 100%; left: 50%; transform: translateX(-50%); margin-top: 2px; display: flex; flex-direction: column; align-items: center; line-height: 1.2; font-size: 0.65rem; color: var(--muted); font-weight: 600; white-space: nowrap; }
 .die.small { width: 26px; height: 26px; font-size: 0.85rem; border-width: 1.5px; border-radius: 6px; }
 @keyframes tumble { 0% { transform: rotate(0) scale(0.9); } 50% { transform: rotate(180deg) scale(1.05); } 100% { transform: rotate(360deg) scale(1); } }
 .die.rolling { animation: tumble 0.45s linear infinite; }

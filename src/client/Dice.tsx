@@ -31,15 +31,24 @@ export function DiceReveal({ rec, startedAt }: { rec: DiceResultRecord; startedA
   const faces = stage >= 2 ? r.finalDice : r.originalDice;
   return (
     <div className="stack">
-      <div className="dice" aria-label="Your dice" style={{ paddingBottom: 18 }}>
+      <div className="dice" aria-label="Your dice" style={{ paddingBottom: 32 }}>
         {faces.map((f, i) => {
           const target = r.rerollIndices.includes(i);
           const cls = ['die', stage === 0 ? 'rolling' : '', stage >= 1 && target ? 'rerolled' : '', stage >= 2 && f === 6 ? 'six' : ''].join(' ');
+          // One stacked label per die so "was N" and "= 5 pts" never overlap.
+          const tags: string[] = [];
+          if (stage >= 1 && target) tags.push(stage >= 2 ? `was ${r.originalDice[i]}` : 'reroll');
+          if (stage >= 3 && r.equipment.includes('loaded_dice') && f === 1) tags.push('= 5 pts');
           return (
             <div key={i} className={cls}>
               {stage === 0 ? '?' : f}
-              {stage >= 1 && target && <span className="tag">{stage >= 2 ? `was ${r.originalDice[i]}` : 'reroll'}</span>}
-              {stage >= 3 && r.equipment.includes('loaded_dice') && f === 1 && <span className="tag">= 5 pts</span>}
+              {tags.length > 0 && (
+                <span className="tag">
+                  {tags.map((t) => (
+                    <span key={t}>{t}</span>
+                  ))}
+                </span>
+              )}
             </div>
           );
         })}
