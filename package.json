@@ -15,7 +15,8 @@
     "balance": "tsx src/tools/balance.ts",
     "simulate": "tsx src/tools/simulate.ts",
     "strategy-tables": "tsx src/tools/strategy-tables.ts",
-    "ev-table": "tsx src/tools/ev-table.ts"
+    "ev-table": "tsx src/tools/ev-table.ts",
+    "strategy-pdf": "cd docs/strategy && tectonic -X compile strategy.tex"
   },
   "dependencies": {
     "@electric-sql/pglite": "0.5.10",
