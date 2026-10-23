@@ -6,6 +6,7 @@ import { DiceReveal } from './Dice.js';
 import { joinRoom } from './Landing.js';
 import { BookView, ExposureStrip, Holdings, Inventory, OpenOrders, OrderForm, Tape, previewEquipment } from './Market.js';
 import { RulesSummary } from './Rules.js';
+import { RoundReview, SessionReport } from './Review.js';
 import { ConnBanner, Countdown, Qty, Toasts, TopBar, navigate, upName, useClient } from './common.js';
 import { type GameClient, type ClientState, creds } from './net.js';
 
@@ -373,6 +374,10 @@ function Results({ s }: { s: Snapshot }) {
         )}
         {last && <UpgradeStats s={s} />}
       </div>
+      {(() => {
+        const rv = (s.reviews ?? []).find((r) => r.playerId === s.you.playerId && r.roundNumber === last?.number);
+        return rv ? <RoundReview r={rv} /> : null;
+      })()}
       {more && <div className="banner warn">Next round starts soon with fresh coins and a new set of upgrades. Reconsider your prices and avoid uncovered shorts.</div>}
       <LeaderboardTable s={s} />
     </div>
@@ -461,6 +466,7 @@ function Finished({ s }: { s: Snapshot }) {
         <p className="small muted">Dice luck affects results; this ranking is not a risk-adjusted skill measure.</p>
       </div>
       <LeaderboardTable s={s} />
+      {s.you.playerId && <SessionReport s={s} playerId={s.you.playerId} />}
     </div>
   );
 }

@@ -6,6 +6,7 @@ import type { Snapshot } from '../shared/types.js';
 import { joinRoom } from './Landing.js';
 import { Tape } from './Market.js';
 import { LeaderboardTable, UpgradeStats } from './Player.js';
+import { HostReviewTable } from './Review.js';
 import { ConnBanner, Countdown, PHASE_LABEL, Toasts, playerName, upName, useClient } from './common.js';
 import { type ClientState, type GameClient, creds } from './net.js';
 
@@ -50,6 +51,7 @@ function HostApp({ code, token }: { code: string; token: string }) {
         </div>
         {s.round && <Tape s={s} limit={15} />}
         {s.completedRounds.length > 0 && <LeaderboardTable s={s} />}
+        {s.phase === 'finished' && <HostReviewTable s={s} />}
       </div>
       <Toasts state={state} />
     </>
