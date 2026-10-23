@@ -119,6 +119,24 @@ for (let i = 0; i < ids.length; i++)
       maxGap = Math.max(maxGap, Math.max(...ms) - Math.min(...ms));
     }
 out.push(`\\newcommand{\\MaxTripleGap}{${f2(maxGap)}}`);
+// Worst case of the selection-timeout rule: keep the starting upgrade if still owned,
+// then fill from owned types in catalog order. Pools have four types, so |S| <= 4.
+let worstFallback = { loss: 0, S: [] as UpgradeId[], start: null as UpgradeId | null, got: [] as UpgradeId[] };
+for (let mask = 0; mask < 1 << ids.length; mask++) {
+  const S = ids.filter((_, i) => mask & (1 << i));
+  if (S.length > 4) continue;
+  for (const start of [null, ...S]) {
+    const got: UpgradeId[] = start ? [start] : [];
+    for (const t of ids) if (got.length < 2 && S.includes(t) && !got.includes(t)) got.push(t);
+    const loss = V(S) - (got.length === 0 ? mean.get('')! : mean.get(key(got))!);
+    if (loss > worstFallback.loss + 1e-12) worstFallback = { loss, S, start, got };
+  }
+}
+out.push(`\\newcommand{\\MaxFallbackLoss}{${f2(worstFallback.loss)}}`);
+out.push(
+  `\\newcommand{\\MaxFallbackWhere}{owning ${nm(worstFallback.S)} with ${worstFallback.start ? CATALOG[worstFallback.start].name : 'no'} as the starting upgrade, where the rule equips ${nm(worstFallback.got)}}`,
+);
+console.log('worst fallback', f2(worstFallback.loss), worstFallback);
 console.log('max marginal over all S', f2(bestAll.v), bestAll.S, bestAll.t, 'max triple gap', f2(maxGap));
 
 mkdirSync('docs/strategy', { recursive: true });
