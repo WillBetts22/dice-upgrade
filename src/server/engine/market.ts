@@ -174,6 +174,7 @@ function execute(
   resting.remaining -= qty;
   if (resting.remaining === 0) {
     resting.status = 'filled';
+    resting.closedAt = ctx.now;
     delete round.openOrders[resting.id];
   }
   ctx.changes.orders.set(resting.id, resting);
@@ -259,6 +260,7 @@ export function placeLimitOrder(round: RoundState, playerId: string, input: Plac
     seq: round.nextSeq++,
     status: 'open',
     createdAt: ctx.now,
+    closedAt: null,
   };
 
   const trades: Trade[] = [];
@@ -276,6 +278,7 @@ export function placeLimitOrder(round: RoundState, playerId: string, input: Plac
     ctx.changes.bookTypes.add(type);
   } else {
     order.status = 'filled';
+    order.closedAt = ctx.now;
   }
   ctx.changes.orders.set(order.id, order);
   ctx.changes.accounts.add(playerId);
@@ -330,6 +333,7 @@ export function cancelOrder(round: RoundState, playerId: string, orderId: unknow
   if (!o) throw new EngineError('not_found', 'That order is no longer open.');
   if (o.playerId !== playerId) throw new EngineError('forbidden', 'You can only cancel your own orders.');
   o.status = 'cancelled';
+  o.closedAt = ctx.now;
   delete round.openOrders[o.id];
   ctx.changes.orders.set(o.id, o);
   ctx.changes.accounts.add(playerId);

@@ -40,6 +40,9 @@ export function createRound(room: RoomState, number: number, seed: number, ctx: 
     settlements: [],
     dice: {},
     nextSeq: 1,
+    closedOrders: [],
+    decisions: [],
+    marketClosedAt: null,
   };
   for (const t of plan.pool) {
     round.upgrades[t] = { type: t, lastPrice: null, highPrice: null, volume: 0, initialSupply: plan.supply[t] ?? 0, shortCloseouts: 0 };
@@ -79,6 +82,7 @@ export function createRound(room: RoomState, number: number, seed: number, ctx: 
 export function closeMarket(round: RoundState, ctx: Ctx): void {
   for (const o of Object.values(round.openOrders)) {
     o.status = 'closed';
+    o.closedAt = ctx.now;
     ctx.changes.orders.set(o.id, o);
     ctx.changes.bookTypes.add(o.type);
   }

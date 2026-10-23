@@ -144,6 +144,24 @@ CREATE TABLE IF NOT EXISTS ledger (
   revision integer NOT NULL
 );
 CREATE INDEX IF NOT EXISTS ledger_room_idx ON ledger (room_id, revision);
+ALTER TABLE orders ADD COLUMN IF NOT EXISTS closed_at bigint;
+ALTER TABLE rounds ADD COLUMN IF NOT EXISTS market_closed_at bigint;
+CREATE TABLE IF NOT EXISTS decisions (
+  id text PRIMARY KEY,
+  round_id text NOT NULL REFERENCES rounds(id) ON DELETE CASCADE,
+  player_id text NOT NULL,
+  revision integer NOT NULL,
+  at bigint NOT NULL,
+  kind text NOT NULL,
+  payload jsonb NOT NULL
+);
+CREATE INDEX IF NOT EXISTS decisions_round_idx ON decisions (round_id, revision);
+CREATE TABLE IF NOT EXISTS decision_reviews (
+  round_id text NOT NULL REFERENCES rounds(id) ON DELETE CASCADE,
+  player_id text NOT NULL,
+  review jsonb NOT NULL,
+  PRIMARY KEY (round_id, player_id)
+);
 `;
 
 class PgDb implements Db {

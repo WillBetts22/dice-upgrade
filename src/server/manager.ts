@@ -127,6 +127,7 @@ export class RoomManager {
         players: {},
         round: null,
         completedRounds: [],
+        reviews: [],
       };
       try {
         await insertNewRoom(this.db, room);
@@ -215,7 +216,15 @@ export class RoomManager {
   }
 
   private finalize(draft: RoomState, changes: Changes): void {
-    if (draft.round && changes.trades.length) draft.round.trades.push(...changes.trades);
+    const round = draft.round;
+    if (round) {
+      // Append-only round logs are shared with the previous state and only grow after a commit.
+      if (changes.trades.length) round.trades.push(...changes.trades);
+      if (changes.decisions.length) round.decisions.push(...changes.decisions);
+      for (const o of changes.orders.values()) {
+        if (o.status !== 'open' && o.roundId === round.id && !round.closedOrders.some((c) => c.id === o.id)) round.closedOrders.push(o);
+      }
+    }
     this.rooms.set(draft.id, draft);
     for (const fn of this.listeners) {
       try {

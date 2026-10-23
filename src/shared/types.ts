@@ -1,5 +1,6 @@
 import type { UpgradeId } from './catalog.js';
 import type { DiceResolution } from './dice.js';
+import type { PlayerRoundReview } from './review.js';
 import type { Phase, PhaseDurations } from './rules.js';
 
 export type Side = 'bid' | 'ask';
@@ -25,6 +26,8 @@ export interface Order {
   seq: number;
   status: OrderStatus;
   createdAt: number;
+  /** When the order stopped being open (filled, cancelled or closed at market close). */
+  closedAt?: number | null;
 }
 
 export interface Trade {
@@ -200,6 +203,8 @@ export interface Snapshot {
   you: { kind: 'host' | 'player' | 'spectator'; playerId: string | null };
   account: PrivateAccount | null;
   host: HostInfo | null;
+  /** Decision reviews: a player's own completed rounds; the host sees everyone's once finished. */
+  reviews: PlayerRoundReview[];
 }
 
 export interface HostInfo {

@@ -24,6 +24,9 @@ export function makeRound(players: Record<string, Partial<Record<UpgradeId, numb
     settlements: [],
     dice: {},
     nextSeq: 1,
+    closedOrders: [],
+    decisions: [],
+    marketClosedAt: null,
   };
   for (const t of pool) round.upgrades[t] = { type: t, lastPrice: null, highPrice: null, volume: 0, initialSupply: 0, shortCloseouts: 0 };
   for (const [pid, holds] of Object.entries(players)) {

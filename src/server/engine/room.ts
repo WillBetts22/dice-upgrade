@@ -1,8 +1,10 @@
 import { getPoolVersion } from '../../shared/catalog.js';
 import type { DrawFn } from '../../shared/dice.js';
 import { MAX_PLAYERS, MAX_ROUNDS, MIN_PLAYERS, MIN_ROUNDS, type Phase, type PhaseDurations } from '../../shared/rules.js';
+import { analyzeRound } from '../../shared/analysis.js';
+import type { DecisionEvent } from '../../shared/review.js';
 import type { Command } from '../../shared/types.js';
-import { acceptQuote, cancelOrder, placeLimitOrder } from './market.js';
+import { acceptQuote, cancelOrder, placeLimitOrder, reservedForBids } from './market.js';
 import {
   closeMarket,
   createRound,
@@ -13,7 +15,8 @@ import {
   tradingPlayers,
   validateEquipment,
 } from './rounds.js';
-import { type Ctx, EngineError, type Player, type RoomState } from './state.js';
+import { buildReviewInput } from './review-input.js';
+import { type Ctx, EngineError, type Player, type RoomState, type RoundState } from './state.js';
 
 export type Actor = { kind: 'host' } | { kind: 'player'; playerId: string } | { kind: 'spectator' };
 
@@ -187,19 +190,37 @@ export function applyCommand(room: RoomState, actor: Actor, cmd: Command, ctx: C
     case 'placeLimitOrder': {
       const pid = requirePlayer(room, actor);
       requirePhase(room, 'market', now);
-      placeLimitOrder(room.round!, pid, cmd, ctx);
+      const before = decisionBefore(room.round!, pid);
+      const { order, trades } = placeLimitOrder(room.round!, pid, cmd, ctx);
+      logDecision(room, pid, ctx, before!, {
+        kind: 'order',
+        order: { orderId: order.id, type: order.type, side: order.side, price: order.price, qty: order.originalQty },
+        tradeIds: trades.map((t) => t.id),
+      });
       return;
     }
     case 'acceptQuote': {
       const pid = requirePlayer(room, actor);
       requirePhase(room, 'market', now);
-      acceptQuote(room.round!, pid, cmd, ctx);
+      const before = decisionBefore(room.round!, pid);
+      const trade = acceptQuote(room.round!, pid, cmd, ctx);
+      logDecision(room, pid, ctx, before!, {
+        kind: 'accept',
+        accept: { orderId: trade.restingOrderId, type: trade.type, takerSide: trade.buyerId === pid ? 'bid' : 'ask', price: trade.price, qty: trade.qty },
+        tradeIds: [trade.id],
+      });
       return;
     }
     case 'cancelOrder': {
       const pid = requirePlayer(room, actor);
       requirePhase(room, 'market', now);
-      cancelOrder(room.round!, pid, cmd.orderId, ctx);
+      const before = decisionBefore(room.round!, pid);
+      const o = cancelOrder(room.round!, pid, cmd.orderId, ctx);
+      logDecision(room, pid, ctx, before!, {
+        kind: 'cancel',
+        cancel: { orderId: o.id, type: o.type, side: o.side, price: o.price, remaining: o.remaining },
+        tradeIds: [],
+      });
       return;
     }
     case 'selectEquipment': {
@@ -207,10 +228,12 @@ export function applyCommand(room: RoomState, actor: Actor, cmd: Command, ctx: C
       requirePhase(room, 'selection', now);
       const acct = room.round!.accounts[pid];
       if (!acct) throw new EngineError('not_trader', 'You are not in this round.');
+      const before = decisionBefore(room.round!, pid)!;
       acct.equipment = validateEquipment(room.round!, acct, cmd.types);
       acct.equipmentSubmitted = true;
       acct.revision++;
       ctx.changes.accounts.add(pid);
+      logDecision(room, pid, ctx, before, { kind: 'equip', equip: { types: acct.equipment.slice(), auto: false }, tradeIds: [] });
       ctx.changes.message = acct.equipment.length ? 'Equipment saved.' : 'Slots cleared; the fallback rule will fill them.';
       return;
     }
@@ -254,6 +277,40 @@ export function applyCommand(room: RoomState, actor: Actor, cmd: Command, ctx: C
   }
 }
 
+/** The decider's state just before a decision. Null when they have no account (the engine then rejects). */
+function decisionBefore(round: RoundState, playerId: string): DecisionEvent['before'] | null {
+  const acct = round.accounts[playerId];
+  if (!acct) return null;
+  const positions: DecisionEvent['before']['positions'] = {};
+  const highs: DecisionEvent['before']['highs'] = {};
+  for (const t of round.pool) {
+    positions[t] = acct.positions[t];
+    highs[t] = round.upgrades[t]?.highPrice ?? null;
+  }
+  return { cash: acct.cash, spendable: acct.cash - reservedForBids(round, playerId), positions, highs };
+}
+
+/** Record an accepted decision; it commits at the next revision together with the command. */
+function logDecision(
+  room: RoomState,
+  playerId: string,
+  ctx: Ctx,
+  before: DecisionEvent['before'],
+  rest: Omit<DecisionEvent, 'id' | 'roundId' | 'playerId' | 'revision' | 'at' | 'before'>,
+): void {
+  ctx.changes.decisions.push({
+    id: ctx.newId(),
+    roundId: room.round!.id,
+    playerId,
+    revision: room.revision + 1,
+    at: ctx.now,
+    before,
+    ...rest,
+  });
+}
+
+const sameSet = (a: string[], b: string[]) => a.length === b.length && a.every((x) => b.includes(x));
+
 function startRound(room: RoomState, number: number, ctx: Ctx, env: Env): void {
   if (room.round && room.round.number >= number) throw new Error('round already created');
   room.roundNumber = number;
@@ -281,6 +338,8 @@ export function advancePhase(room: RoomState, ctx: Ctx, env: Env): boolean {
       // Block trading and cancel outstanding orders in the same step.
       room.phase = 'settling';
       closeMarket(round!, ctx);
+      round!.marketClosedAt = now;
+      ctx.changes.roundUpdated = true;
       room.phaseDeadline = now + d.selectionMs;
       break;
     case 'settling':
@@ -291,7 +350,25 @@ export function advancePhase(room: RoomState, ctx: Ctx, env: Env): boolean {
       break;
     case 'selection':
       if (!due) return false;
-      resolveRound(round!, (pid) => env.drawFor(room.id, round!.id, pid), ctx);
+      {
+        const submitted = new Map<string, string[] | null>();
+        const befores = new Map<string, DecisionEvent['before']>();
+        for (const a of Object.values(round!.accounts)) {
+          submitted.set(a.playerId, a.equipmentSubmitted ? a.equipment.slice() : null);
+          befores.set(a.playerId, decisionBefore(round!, a.playerId)!);
+        }
+        resolveRound(round!, (pid) => env.drawFor(room.id, round!.id, pid), ctx);
+        // One equip_final per newly resolved player; auto when the timeout rule chose or changed the slots.
+        for (const d of ctx.changes.dice) {
+          const used = d.resolution.equipment;
+          const sub = submitted.get(d.playerId) ?? null;
+          logDecision(room, d.playerId, ctx, befores.get(d.playerId)!, {
+            kind: 'equip_final',
+            equip: { types: used.slice(), auto: sub === null || !sameSet(sub, used) },
+            tradeIds: [],
+          });
+        }
+      }
       room.phase = 'reveal';
       room.phaseDeadline = now + d.revealMs;
       break;
@@ -299,6 +376,11 @@ export function advancePhase(room: RoomState, ctx: Ctx, env: Env): boolean {
       if (!due) return false;
       if (!room.completedRounds.some((r) => r.number === round!.number)) {
         room.completedRounds = [...room.completedRounds, summarizeRound(room, round!)];
+      }
+      if (!room.reviews.some((r) => r.roundId === round!.id)) {
+        const reviews = analyzeRound(buildReviewInput(room, round!, now));
+        room.reviews = [...room.reviews, ...reviews];
+        ctx.changes.reviews.push(...reviews);
       }
       room.phase = 'results';
       room.phaseDeadline = now + d.resultsMs;

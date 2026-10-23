@@ -1,4 +1,5 @@
 import type { UpgradeId } from '../shared/catalog.js';
+import type { PlayerRoundReview } from '../shared/review.js';
 import type { HostInfo, MarketDelta, PublicOrder, PublicPlayer, PublicRound, Snapshot } from '../shared/types.js';
 import { estimatedDeduction, owedUnits, privateAccount } from './engine/market.js';
 import { leaderboard } from './engine/rounds.js';
@@ -62,6 +63,16 @@ export function hostInfo(room: RoomState): HostInfo {
   return { exposure, owedByType, hostPlayerId: hp?.id ?? null };
 }
 
+/**
+ * Reviews exist only for completed rounds. A player sees only their own; the
+ * host sees everyone's once the session is finished; spectators see none.
+ */
+export function visibleReviews(room: RoomState, actor: Actor): PlayerRoundReview[] {
+  if (actor.kind === 'player') return room.reviews.filter((r) => r.playerId === actor.playerId);
+  if (actor.kind === 'host' && room.phase === 'finished') return room.reviews.slice();
+  return [];
+}
+
 export function buildSnapshot(room: RoomState, actor: Actor, now: number, isConnected: (pid: string) => boolean): Snapshot {
   const playerId = actor.kind === 'player' ? actor.playerId : null;
   return {
@@ -84,6 +95,7 @@ export function buildSnapshot(room: RoomState, actor: Actor, now: number, isConn
     you: { kind: actor.kind, playerId },
     account: playerId && room.round ? privateAccount(room.round, playerId) : null,
     host: actor.kind === 'host' ? hostInfo(room) : null,
+    reviews: visibleReviews(room, actor),
   };
 }
 

@@ -12,6 +12,7 @@ import type {
   UpgradeRoundState,
 } from '../../shared/types.js';
 import type { Phase } from '../../shared/rules.js';
+import type { DecisionEvent, PlayerRoundReview } from '../../shared/review.js';
 
 export interface Player {
   id: string;
@@ -44,6 +45,12 @@ export interface RoundState {
   settlements: SettlementLine[];
   dice: Record<string, DiceResultRecord>;
   nextSeq: number;
+  /** Orders no longer open, append-only (appended after commit) so reviews can see every order. */
+  closedOrders: Order[];
+  /** Accepted player decisions this round, append-only (appended after commit). */
+  decisions: DecisionEvent[];
+  /** When the market phase closed; null until then. */
+  marketClosedAt: number | null;
 }
 
 export interface RoomState {
@@ -61,6 +68,8 @@ export interface RoomState {
   players: Record<string, Player>;
   round: RoundState | null;
   completedRounds: CompletedRound[];
+  /** Decision reviews for completed rounds, all players. Filtered per viewer in view.ts. */
+  reviews: PlayerRoundReview[];
 }
 
 export class EngineError extends Error {
@@ -83,6 +92,10 @@ export class Changes {
   dice: DiceResultRecord[] = [];
   ledger: LedgerEntry[] = [];
   bookTypes = new Set<UpgradeId>();
+  decisions: DecisionEvent[] = [];
+  reviews: PlayerRoundReview[] = [];
+  /** Round row fields changed (market_closed_at). */
+  roundUpdated = false;
   newRound: RoundState | null = null;
   /** Phase-level change: clients receive a full snapshot. */
   full = false;
@@ -107,6 +120,7 @@ export function draftRoom(room: RoomState): RoomState {
     config: structuredClone(room.config),
     players: structuredClone(room.players),
     completedRounds: room.completedRounds,
+    reviews: room.reviews,
     round: r
       ? {
           ...r,
@@ -116,6 +130,8 @@ export function draftRoom(room: RoomState): RoomState {
           settlements: r.settlements.slice(),
           dice: { ...r.dice },
           trades: r.trades,
+          closedOrders: r.closedOrders,
+          decisions: r.decisions,
         }
       : null,
   };

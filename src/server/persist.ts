@@ -61,10 +61,10 @@ async function upsertAccount(q: Queryable, roundId: string, a: RoundAccount): Pr
 
 async function upsertOrder(q: Queryable, o: Order): Promise<void> {
   await q.query(
-    `INSERT INTO orders (id, round_id, player_id, type, side, price, original_qty, remaining, seq, status, created_at)
-     VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11)
-     ON CONFLICT (id) DO UPDATE SET remaining=EXCLUDED.remaining, status=EXCLUDED.status`,
-    [o.id, o.roundId, o.playerId, o.type, o.side, o.price, o.originalQty, o.remaining, o.seq, o.status, o.createdAt],
+    `INSERT INTO orders (id, round_id, player_id, type, side, price, original_qty, remaining, seq, status, created_at, closed_at)
+     VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12)
+     ON CONFLICT (id) DO UPDATE SET remaining=EXCLUDED.remaining, status=EXCLUDED.status, closed_at=EXCLUDED.closed_at`,
+    [o.id, o.roundId, o.playerId, o.type, o.side, o.price, o.originalQty, o.remaining, o.seq, o.status, o.createdAt, o.closedAt ?? null],
   );
 }
 
@@ -129,6 +129,9 @@ export async function commit(
       ]);
     }
     if (round) {
+      if (changes.roundUpdated) {
+        await q.query(`UPDATE rounds SET market_closed_at=$2 WHERE id=$1`, [round.id, round.marketClosedAt]);
+      }
       for (const pid of changes.accounts) if (round.accounts[pid]) await upsertAccount(q, round.id, round.accounts[pid]);
       for (const o of changes.orders.values()) await upsertOrder(q, o);
       for (const t of changes.trades) await insertTrade(q, t);
@@ -148,6 +151,21 @@ export async function commit(
            VALUES ($1,$2,$3,$4,$5,$6,$7)`,
           [round.id, d.playerId, JSON.stringify(d.resolution.equipment), JSON.stringify(d.resolution), d.tradingCash, d.shortDeductions, d.score],
         );
+      }
+      for (const e of changes.decisions) {
+        await q.query(`INSERT INTO decisions (id, round_id, player_id, revision, at, kind, payload) VALUES ($1,$2,$3,$4,$5,$6,$7)`, [
+          e.id,
+          e.roundId,
+          e.playerId,
+          e.revision,
+          e.at,
+          e.kind,
+          JSON.stringify(e),
+        ]);
+      }
+      for (const r of changes.reviews) {
+        // Primary key (round, player) prevents a second review.
+        await q.query(`INSERT INTO decision_reviews (round_id, player_id, review) VALUES ($1,$2,$3)`, [r.roundId, r.playerId, JSON.stringify(r)]);
       }
     }
     for (const l of changes.ledger) {
@@ -197,6 +215,12 @@ export async function loadRoom(db: Db, roomId: string): Promise<RoomState | null
     players,
     round: null,
     completedRounds: row.completed_rounds,
+    reviews: (
+      await db.query(
+        `SELECT dr.review FROM decision_reviews dr JOIN rounds r ON r.id = dr.round_id WHERE r.room_id=$1 ORDER BY r.number, dr.player_id`,
+        [roomId],
+      )
+    ).rows.map((x) => x.review),
   };
   if (room.roundNumber > 0) room.round = await loadRound(db, roomId, room.roundNumber);
   return room;
@@ -218,6 +242,9 @@ async function loadRound(db: Db, roomId: string, number: number): Promise<RoundS
     settlements: [],
     dice: {},
     nextSeq: 1,
+    closedOrders: [],
+    decisions: [],
+    marketClosedAt: n(r.market_closed_at),
   };
   for (const a of (await db.query(`SELECT * FROM round_accounts WHERE round_id=$1`, [id])).rows) {
     round.accounts[a.player_id] = {
@@ -232,10 +259,9 @@ async function loadRound(db: Db, roomId: string, number: number): Promise<RoundS
     };
   }
   let maxSeq = 0;
-  for (const o of (await db.query(`SELECT * FROM orders WHERE round_id=$1`, [id])).rows) {
+  for (const o of (await db.query(`SELECT * FROM orders WHERE round_id=$1 ORDER BY seq`, [id])).rows) {
     maxSeq = Math.max(maxSeq, o.seq);
-    if (o.status !== 'open') continue;
-    round.openOrders[o.id] = {
+    const order = {
       id: o.id,
       roundId: id,
       playerId: o.player_id,
@@ -247,7 +273,13 @@ async function loadRound(db: Db, roomId: string, number: number): Promise<RoundS
       seq: o.seq,
       status: o.status,
       createdAt: Number(o.created_at),
+      closedAt: n(o.closed_at),
     };
+    if (o.status === 'open') round.openOrders[o.id] = order;
+    else round.closedOrders.push(order);
+  }
+  for (const d of (await db.query(`SELECT payload FROM decisions WHERE round_id=$1 ORDER BY revision, at`, [id])).rows) {
+    round.decisions.push(d.payload);
   }
   for (const t of (await db.query(`SELECT * FROM trades WHERE round_id=$1 ORDER BY seq`, [id])).rows) {
     maxSeq = Math.max(maxSeq, t.seq);
