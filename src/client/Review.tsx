@@ -45,6 +45,25 @@ function ItemRow({ it }: { it: ReviewItem }) {
   );
 }
 
+function QuietRows({ items }: { items: ReviewItem[] }) {
+  const [open, setOpen] = useState(false);
+  const unfilled = items.filter((i) => i.kind === 'unfilled').length;
+  const cancels = items.length - unfilled;
+  return (
+    <>
+      <tr onClick={() => setOpen((x) => !x)} style={{ cursor: 'pointer' }}>
+        <td />
+        <td className="muted">
+          {open ? 'Hide' : 'Show'} {unfilled} unfilled order{unfilled === 1 ? '' : 's'} and {cancels} cancel{cancels === 1 ? '' : 's'} (no effect on your score)
+        </td>
+        <td />
+        <td />
+      </tr>
+      {open && items.map((it, i) => <ItemRow key={`q${i}`} it={it} />)}
+    </>
+  );
+}
+
 /** Decomposition card: score = start value + trading EV − equipment loss + dice luck. */
 export function ReviewSummary({ r }: { r: PlayerRoundReview }) {
   const s = r.summary;
@@ -88,6 +107,9 @@ export function ReviewSummary({ r }: { r: PlayerRoundReview }) {
 
 export function RoundReview({ r, title }: { r: PlayerRoundReview; title?: string }) {
   const trades = r.items.filter((i) => i.evExPost !== null);
+  // Unfilled orders and cancels change nothing; fold them into one row.
+  const quiet = r.items.filter((i) => i.kind === 'unfilled' || i.kind === 'cancel');
+  const main = r.items.filter((i) => i.kind !== 'unfilled' && i.kind !== 'cancel');
   const best = trades.reduce<ReviewItem | null>((a, b) => (!a || (b.evExPost ?? 0) > (a.evExPost ?? 0) ? b : a), null);
   const worst = trades.reduce<ReviewItem | null>((a, b) => (!a || (b.evExPost ?? 0) < (a.evExPost ?? 0) ? b : a), null);
   return (
@@ -96,7 +118,7 @@ export function RoundReview({ r, title }: { r: PlayerRoundReview; title?: string
       <ReviewSummary r={r} />
       {best && worst && best !== worst && (
         <p className="small">
-          Best decision: <strong>{best.title}</strong> ({money(best.evExPost!)}). Costliest: <strong>{worst.title}</strong> ({money(worst.evExPost!)}).
+          Best decision: <strong>{best.title}</strong>. Costliest: <strong>{worst.title}</strong>.
         </p>
       )}
       {r.items.length === 0 ? (
@@ -113,9 +135,10 @@ export function RoundReview({ r, title }: { r: PlayerRoundReview; title?: string
               </tr>
             </thead>
             <tbody>
-              {r.items.map((it, i) => (
+              {main.map((it, i) => (
                 <ItemRow key={i} it={it} />
               ))}
+              {quiet.length > 0 && <QuietRows items={quiet} />}
             </tbody>
           </table>
         </div>
@@ -169,7 +192,7 @@ export function SessionReport({ s, playerId }: { s: Snapshot; playerId: string }
             <ul>
               {bad.map((b, i) => (
                 <li key={i}>
-                  Round {b.round}: {b.title} ({money(b.evExPost ?? 0)}). {b.better}
+                  Round {b.round}: {b.title}. {b.better}
                 </li>
               ))}
             </ul>

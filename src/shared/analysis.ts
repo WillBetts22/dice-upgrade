@@ -165,7 +165,12 @@ export function analyzeRound(input: RoundReviewInput): PlayerRoundReview[] {
         shortUnitsAt.set(items.length, v.shortUnits);
       }
       if (verdict === 'bad') {
-        if (kind === 'buy') better = `Your expected gain was ${fmt(v.useValue)} per useful unit. Bidding at most ${Math.floor(v.useValue / Math.max(1, v.useUnits))} would have kept this trade positive.`;
+        if (kind === 'buy') {
+          better =
+            v.useUnits === 0
+              ? `You already owned ${name(t)}, and extra copies give no extra effect, so this purchase could not add value. Only buy types you do not own yet, or units you need to cover a short.`
+              : `It was worth about ${fmt(v.useValue / v.useUnits)} per unit you could use${v.spareUnits ? ` (the other ${plural(v.spareUnits, 'unit')} was a spare copy worth nothing)` : ''}. Bidding at most ${Math.floor(v.useValue / tr.qty)} each would have kept this trade positive.`;
+        }
         else if (kind === 'sell') better = `This upgrade was worth about ${fmt(v.useValue)} to you. Asking at least ${Math.ceil(v.useValue / Math.max(1, v.useUnits)) + 1} would have kept the sale positive.`;
         else if (kind === 'short') better = `Only sell short if you can buy back below ${tr.price}. Buying back at any price up to the current round high beats staying short to the close.`;
         else if (kind === 'cover') better = `Covering above the final round high cost more than the deduction would have. Covering earlier, before the high rose, usually costs less.`;
@@ -237,7 +242,7 @@ export function analyzeRound(input: RoundReviewInput): PlayerRoundReview[] {
           at: input.marketClosedAt,
           kind: 'unfilled',
           title: `${o.side === 'bid' ? 'Bid' : 'Ask'} for ${name(o.type)} at ${o.price} never ${o.remaining === o.originalQty ? 'filled' : 'fully filled'}`,
-          detail: `${plural(o.remaining, 'unit')} of your ${o.side === 'bid' ? 'bid to buy' : 'offer to sell'} ${name(o.type)} at ${o.price} were still on the book when the market closed and were cancelled automatically.`,
+          detail: `${plural(o.remaining, 'unit')} of your ${o.side === 'bid' ? 'bid to buy' : 'offer to sell'} ${name(o.type)} at ${o.price} ${o.remaining === 1 ? 'was' : 'were'} still on the book when the market closed and ${o.remaining === 1 ? 'was' : 'were'} cancelled automatically.`,
           evExAnte: null,
           evExPost: null,
           verdict: 'info',
