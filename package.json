@@ -14,7 +14,8 @@
     "typecheck": "tsc --noEmit",
     "balance": "tsx src/tools/balance.ts",
     "simulate": "tsx src/tools/simulate.ts",
-    "strategy-tables": "tsx src/tools/strategy-tables.ts"
+    "strategy-tables": "tsx src/tools/strategy-tables.ts",
+    "ev-table": "tsx src/tools/ev-table.ts"
   },
   "dependencies": {
     "@electric-sql/pglite": "0.5.10",

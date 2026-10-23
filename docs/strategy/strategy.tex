@@ -1,0 +1,295 @@
+\documentclass[11pt]{article}
+\usepackage[margin=1in]{geometry}
+\usepackage{amsmath,amssymb,amsthm}
+\usepackage{booktabs}
+\usepackage[hidelinks]{hyperref}
+
+\input{tables.tex}
+
+\newtheorem{theorem}{Theorem}
+\newtheorem{proposition}[theorem]{Proposition}
+\newtheorem{lemma}[theorem]{Lemma}
+\newtheorem{corollary}[theorem]{Corollary}
+\theoremstyle{definition}
+\newtheorem{definition}[theorem]{Definition}
+\newtheorem{remark}[theorem]{Remark}
+\newtheorem{heuristic}[theorem]{Heuristic}
+
+\newcommand{\E}{\mathbb{E}}
+\newcommand{\Hf}{H^{\mathrm{fin}}}
+
+\title{Playing Dice Upgrade Well:\\ What Can Be Proven}
+\author{Dice Upgrade project notes}
+\date{Catalog v1}
+
+\begin{document}
+\maketitle
+
+\begin{abstract}
+Dice Upgrade combines a fully known dice game with a live market between players. The dice half can be solved exactly: for every set of upgrades we know the exact expected payout, and therefore exactly what each upgrade is worth to each player, given what that player already holds. The market half depends on what other people do, so no single strategy is optimal against every table. This note proves what can be proven: how to equip, the most an upgrade can be worth to you, why an uncovered short never makes money, when covering a short is never a mistake, and how bad things can get. It ends with a checklist and a precise statement of what is \emph{not} proven. The in-game decision review uses exactly the valuation defined here.
+\end{abstract}
+
+\tableofcontents
+
+\section{Model and notation}
+
+A round has $N$ players and an active pool $\mathcal P$ of four upgrade types. Player $i$ ends the market with trading cash $C_i$ and a signed position $q_{i,t}$ in each type $t \in \mathcal P$. Write
+\[
+  S_i = \{\, t \in \mathcal P : q_{i,t} > 0 \,\}, \qquad O_{i,t} = \max(0, -q_{i,t})
+\]
+for the set of types player $i$ owns and the units of $t$ they owe. Let $\Hf_t$ be the round high of type $t$ at the close: the highest price of any executed trade between players. The bank charges each owed unit at $\Hf_t$, so the short deduction is
+\[
+  D_i = \sum_{t} O_{i,t}\,\Hf_t .
+\]
+(If $t$ never traded, a fallback of 10 is used. That cannot happen to a player who is short through a trade, because that trade sets a high.) After the market, player $i$ equips a set $E_i \subseteq S_i$ with $|E_i| \le 2$, rolls dice, and receives payout $Y_i$. The round score is
+\[
+  X_i = C_i + Y_i - D_i .
+\]
+
+\begin{definition}[Expected payout table]
+For an equipment set $P$ with $|P| \le 2$, let $\mu(P) = \E[Y \mid E = P]$. These 22 numbers (no upgrade, 6 singles, 15 pairs) are computed exactly by enumerating every roll and every reroll. They are rationals; for example $\mu(\varnothing) = 24494400/279936 = \BasePayout$. Table~\ref{tab:ranked} lists them all.
+\end{definition}
+
+\begin{definition}[Use value of a holding]
+For an owned set $S$, let $V(S) = \max\{\mu(P) : P \subseteq S,\ |P| \le 2\}$. This is the best expected payout available from $S$.
+\end{definition}
+
+\paragraph{Objective.} Unless stated otherwise, a player maximises expected total score (risk neutrality). Section~\ref{sec:rank} discusses playing to win instead.
+
+\section{Structural results}
+
+\begin{proposition}[Rounds decouple]\label{prop:decouple}
+Maximising expected total score is the same as maximising the expected score of each round separately.
+\end{proposition}
+\begin{proof}
+The total is the sum of round scores, so by linearity $\E[\sum_r X_{i,r}] = \sum_r \E[X_{i,r}]$. At the start of every round, cash, positions, orders, highs, equipment, deductions and dice all reset. The new pool and deal depend only on the private deal seed and on the expected values of cards already \emph{dealt}, never on what anyone did. So no action in round $r$ changes the distribution of anything in round $r+1$, and each round's expected score can be maximised on its own.
+\end{proof}
+
+\begin{proposition}[Trading cash is zero-sum]\label{prop:zerosum}
+During the market, $\sum_i C_i = 100N$ at every moment. Hence
+\[
+  \sum_i X_i = 100N + \sum_i Y_i - \sum_i D_i .
+\]
+\end{proposition}
+\begin{proof}
+Every trade moves $p\cdot x$ coins from the buyer to the seller and changes nothing else in cash. The bank never pays or receives trading cash: deductions are taken from score, not cash.
+\end{proof}
+
+So the table as a whole gains only from where the upgrades end up (higher $\sum Y$) and loses only through bank deductions. Trading is a redistribution game on top of that.
+
+\begin{proposition}[Expected score at the close]\label{prop:value}
+Given the state at the close of the market, a player who equips optimally has
+\[
+  \E[X_i \mid \text{close}] = C_i - D_i + V(S_i).
+\]
+\end{proposition}
+\begin{proof}
+$C_i$ and $D_i$ are fixed at the close. The dice are drawn after the selection deadline from a source independent of everything in the market, and the payout is a deterministic function of the equipment and the draws. So $\E[Y_i \mid E_i = P] = \mu(P)$, and the best choice gives $V(S_i)$.
+\end{proof}
+
+\section{Optimal equipment}
+
+\begin{theorem}[Equip the best pair]\label{thm:equip}
+At selection, equip $\arg\max\{\mu(P): P \subseteq S,\ |P|\le 2\}$. If you own at least two types, this is always a pair.
+\end{theorem}
+\begin{proof}
+The first claim is Proposition~\ref{prop:value}. For the second, exact enumeration gives $\mu(\{A,B\}) \ge \max(\mu(\{A\}), \mu(\{B\}))$ for all 15 pairs (Table~\ref{tab:ranked} and the balance report), so adding a second owned type never lowers the expected payout.
+\end{proof}
+
+\begin{corollary}[Dead inventory]\label{cor:dead}
+At the close, every unit you will not equip (any second copy, and any owned type outside your best pair) adds nothing to your score. Selling such a unit at any price $p \ge 1$ raises your expected score by $p$.
+\end{corollary}
+\begin{proof}
+$V$ depends only on the set $S$, not on how many copies you hold, and a type outside the optimal pair can be removed from $S$ without changing $V(S)$.
+\end{proof}
+
+\paragraph{Do not rely on the timeout rule.} If you do not choose, the server keeps your starting upgrade (if you still own it) and fills empty slots in catalog order, not by value. Over every owned set of at most four types and every starting upgrade, the worst case of that rule is a loss of \MaxFallbackLoss{} in expected payout: \MaxFallbackWhere. Table~\ref{tab:triples} shows the best and worst pair for every owned triple.
+
+\begin{table}[ht]\centering\small
+\TableTriples
+\caption{Best and worst pair for each owned set of three types (expected payout in brackets). ED Extra Die, SC Second Chance, LD Loaded Dice, SH Six Hunter, JP Jackpot, SN Safety Net.}\label{tab:triples}
+\end{table}
+
+\section{What an upgrade is worth to you}
+
+\begin{definition}[Marginal value and selling loss]
+For a player holding owned set $S$:
+\[
+  m(t \mid S) = V(S \cup \{t\}) - V(S), \qquad \ell(t \mid S) = V(S) - V(S \setminus \{t\}).
+\]
+$m$ is the use value of acquiring a first copy of $t$; $\ell$ is the use value lost by selling your only copy. A second copy has use value $0$.
+\end{definition}
+
+\begin{theorem}[One-step trade rule]\label{thm:trade}
+Consider one trade that is not followed by any other change to your holdings. Under the risk-neutral objective:
+\begin{enumerate}
+\item buying a first copy of $t$ at price $p$ changes your expected score by $m(t\mid S) - p$;
+\item selling your only copy at price $p$ changes it by $p - \ell(t\mid S)$;
+\item buying or selling an extra copy (position at least $1$ after the trade) changes it by $\mp p$.
+\end{enumerate}
+So the trade helps if and only if you buy below $m$ or sell above $\ell$.
+\end{theorem}
+\begin{proof}
+By Proposition~\ref{prop:value}, the expected score is $C - D + V(S)$. The trade changes $C$ by $\mp p$, leaves $D$ unchanged (no short is created or covered), and changes $V(S)$ by $+m$, $-\ell$ or $0$ in the three cases.
+\end{proof}
+
+\begin{remark}[What one-step does not capture]
+The rule is exact for each trade in isolation, but it ignores \emph{option value}. For example, a unit you buy now could make a later purchase more valuable (complements), or a better price might appear later. Section~\ref{sec:review} shows that the one-step values of all your trades still add up exactly to your total trading result, whatever order they happen in.
+\end{remark}
+
+\begin{table}[ht]\centering\small
+\TableMarginal
+\caption{Marginal value $m(B\mid\{A\})$ of acquiring the column type while holding exactly the row type. The first row holds nothing. Abbreviations as in Table~\ref{tab:triples}.}\label{tab:marginal}
+\end{table}
+
+Table~\ref{tab:marginal} shows that complements matter a lot. When you hold one type, a second type is worth between \MinMarginal{} and \MaxMarginal{} coins to you, depending on the pair. For example, Jackpot is worth \MaxMarginal{} to a Second Chance holder, but only about 16.68 to someone holding nothing.
+
+\begin{theorem}[Ceiling on use value]\label{thm:ceiling}
+Over every possible owned set $S$ and every type $t \notin S$, $m(t\mid S) \le \MaxMarginalAll$, with equality for \MaxMarginalAllWhere. Hence, under the risk-neutral objective, paying more than \MaxMarginalAll{} for a unit is a loss \emph{unless that unit covers a short}.
+\end{theorem}
+\begin{proof}
+There are only $2^6$ owned sets and six types, so the bound is a finite maximum computed exactly by \texttt{npm run strategy-tables}. For units that do not cover a short, Theorem~\ref{thm:trade} gives an expected change of $m - p$, or $-p$ for extra copies, and both are negative when $p > \MaxMarginalAll$.
+\end{proof}
+
+\begin{lemma}[Zero synergy for pairs that leave the dice alone]\label{lem:additive}
+Let $\{A,B\}$ be a pair in which neither type is Extra Die or Second Chance, and which is not $\{\text{Loaded Dice}, \text{Safety Net}\}$. Then
+\[
+  \mu(\{A,B\}) - \mu(\varnothing) = \bigl(\mu(\{A\}) - \mu(\varnothing)\bigr) + \bigl(\mu(\{B\}) - \mu(\varnothing)\bigr).
+\]
+\end{lemma}
+\begin{proof}
+Without Extra Die or Second Chance, the five dice $R$ are the same roll whatever else is equipped, and no die is rerolled. On every roll $R$, the payout splits into the base $5\sum(\text{points})$, the Safety Net top-up, and the six bonuses. Loaded Dice changes only the points of raw 1s. Safety Net only tops up the base. Six Hunter and Jackpot depend only on the number of raw sixes, and are added after the floor. Excluding $\{\text{Loaded Dice}, \text{Safety Net}\}$ (where the floor depends on Loaded points) means each remaining effect adds a term that does not depend on the other effect. So, roll by roll, $Y_{AB}(R) - Y_\varnothing(R) = (Y_A(R) - Y_\varnothing(R)) + (Y_B(R) - Y_\varnothing(R))$. Taking expectations (linearity) gives the claim.
+\end{proof}
+
+The lemma covers five pairs: Loaded Dice + Six Hunter, Loaded Dice + Jackpot, Six Hunter + Jackpot, Six Hunter + Safety Net and Jackpot + Safety Net. All five show synergy $0$ in the balance report. The other pairs have real interactions:
+\begin{itemize}
+\item Extra Die and Second Chance change the dice, so they give positive synergy with the six-based bonuses (more dice, or rerolled low dice, means more chances at a six).
+\item Safety Net overlaps with anything that raises the base, giving strongly negative synergy with Extra Die, Second Chance and Loaded Dice.
+\end{itemize}
+
+\section{Short selling}
+
+\begin{lemma}\label{lem:high}
+If you sell short at price $p$, then $\Hf_t \ge p$.
+\end{lemma}
+\begin{proof}
+Your sale is an executed trade between players, the round high is the maximum over all such trades, and it never decreases.
+\end{proof}
+
+\begin{theorem}[An uncovered short never profits]\label{thm:short}
+A unit sold short at $p$ and still owed at the close changes expected score by $p - \Hf_t \le 0$. It gives you no upgrade effect. If you buy it back at $q$, the round trip changes expected score by exactly $p - q$, whatever the high does.
+\end{theorem}
+\begin{proof}
+Selling credits $p$ and, if still owed at the close, adds a deduction of $\Hf_t$; Lemma~\ref{lem:high} gives the sign. A covering purchase at $q$ costs $q$ and removes the deduction, so the two trades together change cash by $p - q$ and leave $D$ and $S$ unchanged.
+\end{proof}
+
+So a short is purely a bet that you can buy back for less than you sold. The only way it pays is a later cover below $p$.
+
+\begin{theorem}[Covering at or below the current high is never worse than waiting for the close]\label{thm:cover}
+Suppose you owe a unit of $t$ and someone is offering it at $q \le H_t^{\text{now}}$, the current round high. Buying it now is weakly better than staying short until the close.
+\end{theorem}
+\begin{proof}
+Covering costs $q$. Staying short costs $\Hf_t$ at the close. Highs never decrease, so $\Hf_t \ge H_t^{\text{now}} \ge q$.
+\end{proof}
+
+The theorem compares covering now against \emph{never} covering. It does not rule out waiting for a cheaper ask, but waiting risks the high rising and the asks disappearing.
+
+\begin{proposition}[How bad it can get, and why it cannot be bounded further]\label{prop:worst}
+Each owed unit costs at most 50, and the total deduction is at most 100 per round. Moreover, any two other players can raise $\Hf_t$ to any price $h \le 50$ at zero cost to the pair of them, so no bound tighter than 50 per unit holds without assumptions about other players.
+\end{proposition}
+\begin{proof}
+Prices are capped at 50, and the short limit counts at most 2 owed units, including all open asks that could fill. For the second claim: player $X$ sells one unit to player $Y$ at $h$, and $Y$ immediately sells it back to $X$ at $h$. Both trades are between different players, so they are allowed and both set the high. Afterwards both players' cash and positions are exactly as before, and the high is at least $h$. $X$ needs either a unit or room under the short limit, and $Y$ needs $h \le 50$ spendable coins, which every player has at the start.
+\end{proof}
+
+\begin{remark}[Squeezes]
+To a player who is short, a covering unit is worth the deduction it avoids, up to 50, which is far above any use value (Theorem~\ref{thm:ceiling}). Holders of a type that others are short in therefore have bargaining power near the close. This is intended: the game rewards covering early.
+\end{remark}
+
+\section{Prices and bargaining}
+
+\begin{proposition}[Gains from trade]\label{prop:bargain}
+A one-unit trade from a seller who loses $\ell$ to a buyer who gains $m$, at price $p$, changes their expected scores by $p - \ell$ and $m - p$. The total, $m - \ell$, does not depend on $p$. Both gain if and only if $\ell < p < m$.
+\end{proposition}
+\begin{proof}
+Theorem~\ref{thm:trade} for each side.
+\end{proof}
+
+Because holdings are public, everyone can compute everyone else's $m$ and $\ell$ from Table~\ref{tab:marginal}. Under the model, that is complete information about values. Even so, the model does not determine \emph{which} price in $(\ell, m)$ will be agreed. That is a bargaining problem: symmetric Nash bargaining would suggest the midpoint, and alternating-offer models depend on patience. A continuous double auction with many traders has no single equilibrium price we can prove. We do not claim one.
+
+What can be said: when several buyers value the same unit, a seller who waits can usually get close to the second-highest buyer value. That is the logic of an ascending auction, but here it is a heuristic, not a theorem.
+
+\section{Playing to win instead of maximising expected score}\label{sec:rank}
+
+The leaderboard ranks total scores, and ranking is not linear in score. In the final round the right objective is the probability of finishing first, and that depends on the spread of outcomes, not just the mean.
+
+\begin{heuristic}[Variance in the final round]
+If you are behind, prefer equipment with a fatter upper tail even at a slightly lower mean. If you are ahead, prefer low variance.
+\end{heuristic}
+Table~\ref{tab:ranked} gives the exact standard deviation and tail probabilities. Six Hunter + Jackpot has the largest spread (maximum 335). Second Chance + Jackpot has the highest mean and also a high chance of 200 or more. Safety Net pairs and Extra Die + Loaded Dice are the steadiest. This is labelled a heuristic because the best choice depends on everyone else's scores and choices, which this note does not model.
+
+\begin{table}[ht]\centering\small
+\TableRanked
+\caption{Every equipment option ranked by exact expected payout $\mu$, with standard deviation $\sigma$, exact tail probabilities and the maximum possible payout.}\label{tab:ranked}
+\end{table}
+
+\section{How the in-game decision review scores you}\label{sec:review}
+
+The review uses the same model. It walks through your trades in time order and gives each unit a value:
+\begin{itemize}
+\item \textbf{Buying:} a unit that covers a short is worth the deduction it removes ($\Hf_t$ ex-post, or the high at that moment ex-ante). A unit that takes your position from $0$ to $1$ is worth $m(t\mid S)$. Further copies are worth $0$. The decision's EV is the total value minus the price paid.
+\item \textbf{Selling:} selling down to a position of $1$ or more costs $0$. The unit that takes you from $1$ to $0$ costs $\ell(t\mid S)$. A unit that takes you below $0$ is a short and costs $\Hf_t$ (ex-post) or the high including that sale (ex-ante, which is at least the sale price). The decision's EV is the price received minus the total cost.
+\end{itemize}
+A short that you later bought back is labelled by its round trip $p - q$ (Theorem~\ref{thm:short}). Equipment is scored as $\mu(E) - V(S)$, the shortfall from your best option. Spare units at the close and cheaper covers you missed are listed as information.
+
+\begin{theorem}[The review adds up]\label{thm:telescope}
+With ex-post values, the EVs of all of a player's trades sum to
+\[
+  \textstyle\sum \mathrm{EV} = (C - 100) + V(S) - V(S_0) - D ,
+\]
+where $S_0$ is the starting holding and $S$ the owned set at the close. Consequently
+\[
+  X = \underbrace{100 + V(S_0)}_{\text{start value}} + \underbrace{\textstyle\sum \mathrm{EV}}_{\text{trading}} - \underbrace{\bigl(V(S) - \mu(E)\bigr)}_{\text{equipment loss}} + \underbrace{\bigl(Y - \mu(E)\bigr)}_{\text{dice luck}} .
+\]
+\end{theorem}
+\begin{proof}
+Let $\Phi = C + V(S) - \sum_t \Hf_t\,O_t$. By construction, each unit of each trade changes $\Phi$ by exactly that unit's EV: cash moves by the price; $V$ changes only when a position crosses between $0$ and $1$, and then by $m$ or $\ell$; and the owed term changes by $\Hf_t$ exactly when a position moves below $0$ or back up. So the EVs telescope to $\Phi_{\text{close}} - \Phi_{\text{start}}$, with $\Phi_{\text{start}} = 100 + V(S_0)$.
+
+At the close the bank returns every owed unit to $0$ without creating owned units, so $S$ is unchanged and $D = \sum_t \Hf_t O_t$ (the 100 cap never binds, since at most two units are owed at no more than 50 each). Substituting into $X = C + Y - D$ gives the identity.
+\end{proof}
+
+The test suite checks this identity on randomly generated complete rounds, so every number in the report can be traced back to the final score.
+
+\section{Strategy checklist}
+\begin{enumerate}
+\item Before trading, look up your own row in Table~\ref{tab:marginal}, and the rows of the players who hold what you want (the Holdings tab). That tells you your value and theirs.
+\item Buy a first copy only below your marginal value $m$, and sell your only copy only above your loss $\ell$ (Theorem~\ref{thm:trade}). Never pay more than \MaxMarginalAll{} for use value (Theorem~\ref{thm:ceiling}).
+\item Look for complements. A second type can be worth from \MinMarginal{} to \MaxMarginal{} depending on what you hold. Safety Net is a weak partner for Extra Die, Second Chance and Loaded Dice.
+\item Sell every spare copy and every type outside your best pair before the close, at any price of 1 or more (Corollary~\ref{cor:dead}).
+\item Short only if you expect to buy back below your sale price. Cover as soon as an ask at or below the current high appears (Theorems~\ref{thm:short} and~\ref{thm:cover}). Keep enough spendable cash to cover.
+\item If you hold a type that others are short in, you have leverage near the close (Remark after Proposition~\ref{prop:worst}).
+\item At selection, choose your best pair yourself. The timeout rule can cost up to \MaxFallbackLoss{}.
+\item In the final round, adjust for rank: more variance if you are behind, less if you are ahead.
+\end{enumerate}
+
+\section{What this does not prove}
+\begin{itemize}
+\item There is no proof of an equilibrium or an optimal pricing strategy for the market as a whole. Outcomes depend on what other players do.
+\item The model is risk-neutral and per round. Playing for rank, or with real risk aversion, can change the right choice.
+\item The one-step trade rule ignores option value, attention and time pressure.
+\item Collusion is possible: Proposition~\ref{prop:worst} shows that two players can raise a high at no cost to themselves. The market is not manipulation-proof.
+\item Expected values say nothing about a single game. Dice luck is large: the standard deviation of a plain roll is about 19 coins.
+\end{itemize}
+
+\appendix
+\section{How the numbers are computed}
+Every number in the tables is computed exactly, not simulated. For each equipment set, the tools enumerate all $6^n$ initial rolls ($n = 5$, or $6$ with Extra Die) and, for each roll that triggers $k$ Second Chance rerolls, all $6^k$ replacements, weighting each path by its probability. The means are stored as exact integer sums over the common denominator $6^n \cdot 36$, then divided once; for example $\mu(\text{\BestPairName}) = 36377910/279936 = \BestPairMean$.
+
+To reproduce:
+\begin{itemize}
+\item \texttt{npm run balance}: the balance report, including the release checks;
+\item \texttt{npm run ev-table}: the hardcoded table \texttt{src/shared/ev-table.ts} used by the decision review (a test checks it against the enumeration);
+\item \texttt{npm run strategy-tables}: \texttt{docs/strategy/tables.tex}, which this document inputs, including the bounds over all holdings;
+\item \texttt{npm test}: the full test suite, including the identity of Theorem~\ref{thm:telescope}.
+\end{itemize}
+
+\end{document}
