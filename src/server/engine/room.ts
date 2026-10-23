@@ -378,9 +378,14 @@ export function advancePhase(room: RoomState, ctx: Ctx, env: Env): boolean {
         room.completedRounds = [...room.completedRounds, summarizeRound(room, round!)];
       }
       if (!room.reviews.some((r) => r.roundId === round!.id)) {
-        const reviews = analyzeRound(buildReviewInput(room, round!, now));
-        room.reviews = [...room.reviews, ...reviews];
-        ctx.changes.reviews.push(...reviews);
+        // A review failure must never block the game: log it and advance without reviews.
+        try {
+          const reviews = analyzeRound(buildReviewInput(room, round!, now));
+          room.reviews = [...room.reviews, ...reviews];
+          ctx.changes.reviews.push(...reviews);
+        } catch (e) {
+          console.error('decision review failed', round!.id, e);
+        }
       }
       room.phase = 'results';
       room.phaseDeadline = now + d.resultsMs;

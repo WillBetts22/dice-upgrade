@@ -68,8 +68,12 @@ export function hostInfo(room: RoomState): HostInfo {
  * host sees everyone's once the session is finished; spectators see none.
  */
 export function visibleReviews(room: RoomState, actor: Actor): PlayerRoundReview[] {
-  if (actor.kind === 'player') return room.reviews.filter((r) => r.playerId === actor.playerId);
-  if (actor.kind === 'host' && room.phase === 'finished') return room.reviews.slice();
+  if (actor.kind === 'host') return room.phase === 'finished' ? room.reviews.slice() : [];
+  if (actor.kind !== 'player') return [];
+  const mine = room.reviews.filter((r) => r.playerId === actor.playerId);
+  // Keep snapshots small: results shows only the round just played; finished shows all.
+  if (room.phase === 'finished') return mine;
+  if (room.phase === 'results') return mine.filter((r) => r.roundNumber === room.roundNumber);
   return [];
 }
 

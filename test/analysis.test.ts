@@ -224,8 +224,47 @@ describe('decision review: close of market', () => {
     const ra = checkIdentity(sim).find((r) => r.playerId === 'a')!;
     const missed = ra.items.find((i) => i.kind === 'missed_cover')!;
     expect(missed.title).toMatch(/could have saved 15\.00/);
-    expect(missed.detail).toMatch(/c was offering it at 15/);
+    expect(missed.detail).toMatch(/c was offering 1 unit at 15/);
     expect(missed.verdict).toBe('info');
+  });
+
+  it('counts a missed cover only for as many units as the cheaper ask offered', () => {
+    const sim = new Sim(makeRound({ a: { six_hunter: 1 }, b: { loaded_dice: 1 }, c: { extra_die: 1 }, d: { extra_die: 1 }, e: { second_chance: 1 } }, POOL_ED));
+    sim.bid('b', 'extra_die', 12, 2);
+    sim.ask('a', 'extra_die', 12, 2); // a is short 2
+    sim.ask('c', 'extra_die', 15); // one cheaper unit
+    sim.ask('d', 'extra_die', 30);
+    sim.take('e', 'd', 'ask'); // high 30
+    sim.close();
+    const ra = checkIdentity(sim).find((r) => r.playerId === 'a')!;
+    const missed = ra.items.find((i) => i.kind === 'missed_cover')!;
+    expect(missed.title).toMatch(/could have saved 15\.00/);
+  });
+
+  it('ex-ante values a short at the round high the player saw when deciding', () => {
+    const sim = new Sim(makeRound({ a: { six_hunter: 1 }, b: { loaded_dice: 1 }, c: { extra_die: 1 } }, POOL_ED));
+    sim.bid('b', 'extra_die', 12);
+    sim.ask('a', 'extra_die', 12);
+    sim.close();
+    const tr = sim.round.trades[0];
+    const incoming = tr.incomingOrderId!;
+    const decision = {
+      id: 'd1',
+      roundId: sim.round.id,
+      playerId: 'a',
+      revision: 1,
+      at: tr.createdAt,
+      kind: 'order' as const,
+      order: { orderId: incoming, type: 'extra_die' as const, side: 'ask' as const, price: 12, qty: 1 },
+      before: { cash: 100, spendable: 100, positions: {}, highs: { extra_die: 40 } },
+      tradeIds: [tr.id],
+    };
+    const ra = analyzeRound(sim.input([decision])).find((r) => r.playerId === 'a')!;
+    const short = ra.items.find((i) => i.kind === 'short')!;
+    expect(short.evExAnte).toBeCloseTo(12 - 40, 9);
+    // Without a logged decision it falls back to the high including the trade.
+    const rb = analyzeRound(sim.input()).find((r) => r.playerId === 'a')!;
+    expect(rb.items.find((i) => i.kind === 'short')!.evExAnte).toBeCloseTo(0, 9);
   });
 
   it('lists unfilled and cancelled orders as information', () => {

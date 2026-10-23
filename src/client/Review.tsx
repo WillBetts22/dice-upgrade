@@ -25,7 +25,13 @@ function ItemRow({ it }: { it: ReviewItem }) {
           <Ev v={it.evExAnte} />
         </td>
         <td className="num">
-          <Ev v={it.evExPost} />
+          {it.roundTrip !== undefined ? (
+            <span title={`Short alone ${money(it.evExPost ?? 0)}; the buy-back row carries the rest`}>
+              trip <Ev v={it.roundTrip} />
+            </span>
+          ) : (
+            <Ev v={it.evExPost} />
+          )}
         </td>
       </tr>
       {open && (
@@ -75,7 +81,7 @@ export function ReviewSummary({ r }: { r: PlayerRoundReview }) {
           <td className="num">{s.startValue.toFixed(2)}</td>
         </tr>
         <tr>
-          <td>Trading EV (sum of the trades below)</td>
+          <td>Trading EV (sum of the buy and sell rows below; a short and its buy-back add up to the round trip)</td>
           <td className="num">
             <Ev v={s.tradingEV} />
           </td>
@@ -106,12 +112,13 @@ export function ReviewSummary({ r }: { r: PlayerRoundReview }) {
 }
 
 export function RoundReview({ r, title }: { r: PlayerRoundReview; title?: string }) {
-  const trades = r.items.filter((i) => i.evExPost !== null);
+  const trades = r.items.filter((i) => i.tradeId && !i.coversShort);
+  const judged = (i: ReviewItem) => i.roundTrip ?? i.evExPost ?? 0;
   // Unfilled orders and cancels change nothing; fold them into one row.
   const quiet = r.items.filter((i) => i.kind === 'unfilled' || i.kind === 'cancel');
   const main = r.items.filter((i) => i.kind !== 'unfilled' && i.kind !== 'cancel');
-  const best = trades.reduce<ReviewItem | null>((a, b) => (!a || (b.evExPost ?? 0) > (a.evExPost ?? 0) ? b : a), null);
-  const worst = trades.reduce<ReviewItem | null>((a, b) => (!a || (b.evExPost ?? 0) < (a.evExPost ?? 0) ? b : a), null);
+  const best = trades.reduce<ReviewItem | null>((a, b) => (!a || judged(b) > judged(a) ? b : a), null);
+  const worst = trades.reduce<ReviewItem | null>((a, b) => (!a || judged(b) < judged(a) ? b : a), null);
   return (
     <div className="card stack">
       <h3>{title ?? `Decision review, round ${r.roundNumber}`}</h3>
@@ -157,11 +164,14 @@ export function SessionReport({ s, playerId }: { s: Snapshot; playerId: string }
   if (!mine.length) return null;
   const sum = (f: (r: PlayerRoundReview) => number) => mine.reduce((a, r) => a + f(r), 0);
   const allItems = mine.flatMap((r) => r.items.map((it) => ({ ...it, round: r.roundNumber })));
-  const bad = allItems.filter((i) => i.verdict === 'bad').sort((a, b) => (a.evExPost ?? 0) - (b.evExPost ?? 0)).slice(0, 3);
+  const bad = allItems
+    .filter((i) => i.verdict === 'bad' && !i.coversShort)
+    .sort((a, b) => (a.roundTrip ?? a.evExPost ?? 0) - (b.roundTrip ?? b.evExPost ?? 0))
+    .slice(0, 3);
   return (
     <div className="stack">
       <div className="card stack">
-        <h2>Your decision report{s.you.kind === 'host' ? `: ${playerName(s, playerId)}` : ''}</h2>
+        <h2>{s.you.kind === 'host' ? `Decision report: ${playerName(s, playerId)}` : 'Your decision report'}</h2>
         <div className="strip">
           <div className="stat">
             <div className="k">Trading EV</div>
@@ -200,7 +210,7 @@ export function SessionReport({ s, playerId }: { s: Snapshot; playerId: string }
         )}
       </div>
       {mine.map((r) => (
-        <RoundReview key={r.roundId} r={r} />
+        <RoundReview key={`${r.playerId}:${r.roundId}`} r={r} />
       ))}
     </div>
   );
@@ -253,7 +263,7 @@ export function HostReviewTable({ s }: { s: Snapshot }) {
           </tbody>
         </table>
       </div>
-      {pick && <SessionReport s={s} playerId={pick} />}
+      {pick && <SessionReport key={pick} s={s} playerId={pick} />}
     </div>
   );
 }

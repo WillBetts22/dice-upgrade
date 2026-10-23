@@ -236,10 +236,10 @@ Table~\ref{tab:ranked} gives the exact standard deviation and tail probabilities
 
 The review uses the same model. It walks through your trades in time order and gives each unit a value:
 \begin{itemize}
-\item \textbf{Buying:} a unit that covers a short is worth the deduction it removes ($\Hf_t$ ex-post, or the high at that moment ex-ante). A unit that takes your position from $0$ to $1$ is worth $m(t\mid S)$. Further copies are worth $0$. The decision's EV is the total value minus the price paid.
-\item \textbf{Selling:} selling down to a position of $1$ or more costs $0$. The unit that takes you from $1$ to $0$ costs $\ell(t\mid S)$. A unit that takes you below $0$ is a short and costs $\Hf_t$ (ex-post) or the high including that sale (ex-ante, which is at least the sale price). The decision's EV is the price received minus the total cost.
+\item \textbf{Buying:} a unit that covers a short is worth the deduction it removes ($\Hf_t$ ex-post; ex-ante, the round high you saw when you made the decision that led to the trade). A unit that takes your position from $0$ to $1$ is worth $m(t\mid S)$. Further copies are worth $0$. The decision's EV is the total value minus the price paid.
+\item \textbf{Selling:} selling down to a position of $1$ or more costs $0$. The unit that takes you from $1$ to $0$ costs $\ell(t\mid S)$. A unit that takes you below $0$ is a short and costs $\Hf_t$ (ex-post) or, ex-ante, the larger of the round high you saw when deciding and the sale price itself, since your own sale sets a high of at least that price. The decision's EV is the price received minus the total cost.
 \end{itemize}
-A short that you later bought back is labelled by its round trip $p - q$ (Theorem~\ref{thm:short}). Equipment is scored as $\mu(E) - V(S)$, the shortfall from your best option. Spare units at the close and cheaper covers you missed are listed as information.
+For a resting order that filled later, ``when you decided'' means when you posted the order. A short that you later bought back is labelled by its round trip $p - q$ (Theorem~\ref{thm:short}); its row shows the round trip, and the buy-back row is not counted again as a separate best or worst decision. The individual EVs still sum as in Theorem~\ref{thm:telescope}. Equipment is scored as $\mu(E) - V(S)$, the shortfall from your best option. Spare units at the close and cheaper covers you missed are listed as information; a missed cover counts only as many units as the cheaper ask offered.
 
 \begin{theorem}[The review adds up]\label{thm:telescope}
 With ex-post values, the EVs of all of a player's trades sum to

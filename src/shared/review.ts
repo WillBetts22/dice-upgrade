@@ -61,6 +61,10 @@ export interface ReviewItem {
   /** What a better decision would have been, when there was one. */
   better?: string;
   tradeId?: string;
+  /** Short fully bought back: net coins of the whole round trip (sale price minus buy-back prices). */
+  roundTrip?: number;
+  /** A buy that closed (part of) an earlier short; the short's row carries the round-trip result. */
+  coversShort?: boolean;
 }
 
 export interface PlayerRoundReview {

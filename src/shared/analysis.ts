@@ -49,13 +49,28 @@ export function analyzeRound(input: RoundReviewInput): PlayerRoundReview[] {
   for (const t of pool) closeRef[t] = input.finalHighs[t] ?? CLOSEOUT_FALLBACK_PRICE;
   for (const s of input.settlements) closeRef[s.type] = s.closeoutPrice;
 
-  // Ex-ante high: the highest executed price for the type up to and including each trade.
+  // Ex-ante high: what the decider knew. That is the round high logged with the decision that led to
+  // the trade (the order for a resting or incoming order, the accept for a taken quote), raised to the
+  // trade's own price, which they knew would print. Without a logged decision, fall back to the
+  // highest executed price up to and including the trade.
   const highAt = new Map<string, number>();
   const running: Record<string, number> = {};
   for (const tr of trades) {
     running[tr.type] = Math.max(running[tr.type] ?? 0, tr.price);
     highAt.set(tr.id, running[tr.type]);
   }
+  const decisionByOrder = new Map<string, (typeof input.decisions)[number]>();
+  const decisionByTrade = new Map<string, (typeof input.decisions)[number]>();
+  for (const d of input.decisions) {
+    if (d.order) decisionByOrder.set(d.order.orderId, d);
+    for (const id of d.tradeIds) decisionByTrade.set(id, d);
+  }
+  const anteHigh = (tr: (typeof trades)[number], pid: string): number => {
+    const ownOrder = orderOwner.get(tr.restingOrderId) === pid ? tr.restingOrderId : tr.incomingOrderId;
+    const d = (ownOrder && decisionByOrder.get(ownOrder)) || decisionByTrade.get(tr.id);
+    if (!d) return highAt.get(tr.id)!;
+    return Math.max(d.before.highs[tr.type] ?? 0, tr.price);
+  };
 
   return input.players.map((player) => {
     const pid = player.id;
@@ -86,7 +101,7 @@ export function analyzeRound(input: RoundReviewInput): PlayerRoundReview[] {
       const buying = tr.buyerId === pid;
       const counterparty = who(buying ? tr.sellerId : tr.buyerId);
       const passive = orderOwner.get(tr.restingOrderId) === pid;
-      const ante = highAt.get(tr.id)!;
+      const ante = anteHigh(tr, pid);
       const v: UnitValue = { useUnits: 0, useValue: 0, spareUnits: 0, shortUnits: 0, shortPost: 0, shortAnte: 0 };
       const heldBefore = ownedSet(pool, q);
       const coveredLots: number[] = [];
@@ -185,6 +200,7 @@ export function analyzeRound(input: RoundReviewInput): PlayerRoundReview[] {
         verdict,
         better,
         tradeId: tr.id,
+        coversShort: coveredLots.length > 0 ? true : undefined,
       });
     }
 
@@ -193,6 +209,7 @@ export function analyzeRound(input: RoundReviewInput): PlayerRoundReview[] {
       const item = items[idx];
       if (c.units < (shortUnitsAt.get(idx) ?? 1)) continue;
       item.verdict = verdictFor(c.net);
+      item.roundTrip = c.net;
       item.title = `${item.title.replace(/: [+-]?[\d.]+$/, '')}, bought back at ${c.prices.join(', ')}: round trip ${signed(c.net)}`;
       item.detail += ` You bought ${c.units === 1 ? 'it' : 'them'} back at ${c.prices.join(', ')}, so the round trip made ${signed(c.net)}.`;
       if (item.verdict !== 'bad') item.better = undefined;
@@ -210,23 +227,26 @@ export function analyzeRound(input: RoundReviewInput): PlayerRoundReview[] {
     for (const s of input.settlements.filter((x) => x.playerId === pid && x.units > 0)) {
       const t = s.type;
       const intervals = shortIntervals[t] ?? [];
-      let cheapest: { price: number; owner: string; at: number } | null = null;
+      let cheapest: { price: number; owner: string; at: number; qty: number } | null = null;
       for (const o of input.orders) {
         if (o.type !== t || o.side !== 'ask' || o.playerId === pid || o.price >= s.closeoutPrice) continue;
+        // Orders closed before close times were recorded have no closedAt; skip rather than guess.
+        if (o.closedAt == null && o.status !== 'open' && o.status !== 'closed') continue;
         const end = o.closedAt ?? input.marketClosedAt;
         for (const [a, b] of intervals) {
           if (o.createdAt < b && end > a && (!cheapest || o.price < cheapest.price)) {
-            cheapest = { price: o.price, owner: o.playerId, at: Math.max(o.createdAt, a) };
+            cheapest = { price: o.price, owner: o.playerId, at: Math.max(o.createdAt, a), qty: o.originalQty };
           }
         }
       }
       if (cheapest) {
-        const saving = (s.closeoutPrice - cheapest.price) * s.units;
+        const coverable = Math.min(s.units, cheapest.qty);
+        const saving = (s.closeoutPrice - cheapest.price) * coverable;
         items.push({
           at: cheapest.at,
           kind: 'missed_cover',
           title: `Missed a cheaper buy-back of ${name(t)}: could have saved ${fmt(saving)}`,
-          detail: `You still owed ${plural(s.units, 'unit')} of ${name(t)} at the close and were charged ${s.closeoutPrice} each. While you were short, ${who(cheapest.owner)} was offering it at ${cheapest.price}. Buying back there (if you had the cash) would have saved ${fmt(saving)}.`,
+          detail: `You still owed ${plural(s.units, 'unit')} of ${name(t)} at the close and were charged ${s.closeoutPrice} each. While you were short, ${who(cheapest.owner)} was offering ${plural(cheapest.qty, 'unit')} at ${cheapest.price}. Buying back ${plural(coverable, 'unit')} there (if you had the cash) would have saved ${fmt(saving)}.`,
           evExAnte: null,
           evExPost: null,
           verdict: 'info',

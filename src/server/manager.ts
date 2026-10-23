@@ -221,8 +221,9 @@ export class RoomManager {
       // Append-only round logs are shared with the previous state and only grow after a commit.
       if (changes.trades.length) round.trades.push(...changes.trades);
       if (changes.decisions.length) round.decisions.push(...changes.decisions);
+      const known = new Set(round.closedOrders.map((c) => c.id));
       for (const o of changes.orders.values()) {
-        if (o.status !== 'open' && o.roundId === round.id && !round.closedOrders.some((c) => c.id === o.id)) round.closedOrders.push(o);
+        if (o.status !== 'open' && o.roundId === round.id && !known.has(o.id)) round.closedOrders.push(o);
       }
     }
     this.rooms.set(draft.id, draft);

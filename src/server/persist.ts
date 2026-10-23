@@ -165,7 +165,7 @@ export async function commit(
       }
       for (const r of changes.reviews) {
         // Primary key (round, player) prevents a second review.
-        await q.query(`INSERT INTO decision_reviews (round_id, player_id, review) VALUES ($1,$2,$3)`, [r.roundId, r.playerId, JSON.stringify(r)]);
+        await q.query(`INSERT INTO decision_reviews (round_id, player_id, review) VALUES ($1,$2,$3) ON CONFLICT DO NOTHING`, [r.roundId, r.playerId, JSON.stringify(r)]);
       }
     }
     for (const l of changes.ledger) {
