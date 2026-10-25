@@ -4,15 +4,24 @@ A live market-making game for 2 to 30 people. Everyone trades one contract whose
 
 ## Rules
 
-**The contract.** Each round the server secretly deals 10 cards from a standard deck. The contract settles at the sum of their values: ace 1, number cards face value, J 11, Q 12, K 13. Before anything is revealed the fair value is exactly 70.
+**The contracts.** Each round the server secretly deals 10 cards from a standard deck: ace 1, number cards face value, J 11, Q 12, K 13. There are two markets on the same cards (the host can turn the second off):
+
+| Market | Pays | Before anything is revealed | Max width | Max size | Position limit |
+|---|---|---|---|---|---|
+| Sum | sum of all 10 cards | exactly 70 | 4 | 5 | 10 |
+| Product | product of the 3 marked product cards (P) | about 337 (median 210, skewed) | 40 | 3 | 3 |
+
+Players switch between the markets with tabs. Each market has its own quote, positions and P&L; a round's score is both added together. The same piece of information can be worth a lot in one market and little in the other, so players have to work out both fair values and trade where their edge is.
+
+**Personal clues.** Besides private cards, each player gets private clues: true statements about the hidden cards, different for everyone, such as "the 10 cards add up to a multiple of 6", "the product has exactly 2 distinct prime factors" or "the highest product card is a 9". Clues use face values and are not changed by news. The host sets how many private cards (at the open and at each of the first two reveals) and how many clues each player gets.
 
 **Information.** By default the market lasts 8 minutes and new information lands every 2 minutes:
 
 | When (default) | Each player privately gets | Revealed to everyone |
 |---|---|---|
-| Open | 1 card | none |
-| 2:00 | +1 card | 2 cards |
-| 4:00 | +1 card | 4 cards total |
+| Open | 1 card, 1 clue | none |
+| 2:00 | +1 card, +1 clue | 2 cards |
+| 4:00 | +1 card, +1 clue | 4 cards total |
 | 6:00 | none | 7 cards total |
 | Close (8:00) | | all 10, settlement |
 
@@ -75,7 +84,8 @@ npx -y @railway/cli up --service fair-cards
 
 ## How it is built
 
-- `src/shared/cards.ts`: cards, value rules, shocks, exact fair value.
+- `src/shared/cards.ts`: cards, value rules, shocks, exact sum and product fair values.
+- `src/shared/clues.ts`: clue generation and fair values given clues (exact without clues; a Metropolis walk over hidden hands consistent with every clue otherwise).
 - `src/shared/review.ts`: the decision review analyzer (pure).
 - `src/server/engine.ts`: pure game engine; commands, information schedule, trading, settlement.
 - `src/server/manager.ts`: per-room serialized commands, optimistic revision check, append-only event log, idempotent receipts.

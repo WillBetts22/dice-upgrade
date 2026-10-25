@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useState, useSyncExternalStore } from 'react';
 import { cardLabel, cardValue, isRed, ruleSummary, SHOCKS, type ValueRule } from '../shared/cards.js';
-import { ROUND_TYPES } from '../shared/rules.js';
+import type { Clue } from '../shared/clues.js';
+import { type MarketId, MARKETS, ROUND_TYPES } from '../shared/rules.js';
 import type { Phase, Role, Snapshot } from '../shared/types.js';
 import { type ClientState, GameClient } from './net.js';
 
@@ -62,37 +63,77 @@ export function playerName(s: Snapshot, id: string | null | undefined): string {
 export const f1 = (x: number | null | undefined) => (x === null || x === undefined ? '-' : (Math.round(x * 10) / 10).toFixed(1));
 export const signed = (x: number) => `${x >= 0 ? '+' : '-'}${Math.abs(x).toFixed(1)}`;
 
-export function Card({ id, rule, mine, big, fresh }: { id: number | null; rule?: ValueRule; mine?: boolean; big?: boolean; fresh?: boolean }) {
-  if (id === null) return <div className={`pcard hidden ${big ? 'big' : ''}`}>?</div>;
+export function Card({ id, rule, mine, big, fresh, product }: { id: number | null; rule?: ValueRule; mine?: boolean; big?: boolean; fresh?: boolean; product?: boolean }) {
+  const tag = product && <span className="ptag" title="Product card">P</span>;
+  if (id === null) return <div className={`pcard hidden ${big ? 'big' : ''} ${product ? 'prod' : ''}`}>?{tag}</div>;
   const v = rule ? cardValue(id, rule) : null;
   return (
-    <div className={`pcard ${isRed(id) ? 'red' : ''} ${mine ? 'mine' : ''} ${big ? 'big' : ''} ${fresh ? 'new' : ''}`} title={v !== null ? `worth ${v}` : undefined}>
+    <div className={`pcard ${isRed(id) ? 'red' : ''} ${mine ? 'mine' : ''} ${big ? 'big' : ''} ${fresh ? 'new' : ''} ${product ? 'prod' : ''}`} title={`${v !== null ? `worth ${v}` : ''}${product ? ' (product card)' : ''}`.trim() || undefined}>
       {cardLabel(id)}
       {v !== null && <span className="v">{v}</span>}
+      {tag}
     </div>
   );
 }
 
-/** The contract: public cards, then question marks for the hidden ones. */
+/** The contract: public cards, then question marks for the hidden ones; product cards carry a P. */
 export function ContractCards({ s, big, mine = [] }: { s: Snapshot; big?: boolean; mine?: number[] }) {
   const r = s.round!;
   const shown = r.contract ?? r.publicCards;
   const hidden = Math.max(0, r.contractSize - shown.length);
+  const prod = new Set(r.productKnown);
+  const hiddenProduct = Math.max(0, r.productCount - shown.filter((c) => prod.has(c)).length);
   return (
     <div className="cards" aria-label="Contract cards">
       {shown.map((c) => (
-        <Card key={c} id={c} rule={r.rule} big={big} mine={mine.includes(c)} />
+        <Card key={c} id={c} rule={r.rule} big={big} mine={mine.includes(c)} product={prod.has(c)} />
       ))}
       {Array.from({ length: hidden }, (_, i) => (
-        <Card key={`h${i}`} id={null} big={big} />
+        <Card key={`h${i}`} id={null} big={big} product={i < hiddenProduct} />
       ))}
+    </div>
+  );
+}
+
+/** Tabs to switch between the markets running this round. */
+export function MarketTabs({ s, value, onChange }: { s: Snapshot; value: MarketId; onChange: (m: MarketId) => void }) {
+  const ids = s.round?.marketIds ?? ['sum'];
+  if (ids.length < 2) return null;
+  return (
+    <div className="seg tabs" role="tablist">
+      {ids.map((m) => {
+        const b = s.me?.books[m];
+        return (
+          <button key={m} role="tab" aria-selected={value === m} aria-pressed={value === m} onClick={() => onChange(m)}>
+            {MARKETS[m].name}
+            {b && b.position !== 0 && <span className="small"> ({b.position > 0 ? `+${b.position}` : b.position})</span>}
+            {b && s.me!.role !== 'taker' && !(b.quote && b.quote.bidSize > 0 && b.quote.askSize > 0) && s.phase === 'market' && <span className="small notlive"> no quote</span>}
+          </button>
+        );
+      })}
+    </div>
+  );
+}
+
+export function ClueList({ clues }: { clues: Clue[] }) {
+  if (!clues.length) return null;
+  return (
+    <div>
+      <div className="small muted">Your private clues (face values: A=1 ... K=13; news does not change them)</div>
+      <ul className="clues">
+        {clues.map((c) => (
+          <li key={c.id}>
+            <span className={`badge mk-${c.market}`}>{MARKETS[c.market].short}</span> {c.text}
+          </li>
+        ))}
+      </ul>
     </div>
   );
 }
 
 export function RuleLine({ rule }: { rule: ValueRule }) {
   const parts = ruleSummary(rule);
-  return <span className="small">{parts.length ? `Rule now: ${parts.join(', ')}` : 'A=1 ... K=13, settles at the sum'}</span>;
+  return <span className="small">{parts.length ? `Rule now: ${parts.join(', ')}` : 'A=1 ... K=13. Sum market: all cards. Product market: the P cards.'}</span>;
 }
 
 export function ShockBanner({ s }: { s: Snapshot }) {

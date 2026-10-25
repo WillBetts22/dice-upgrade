@@ -16,6 +16,13 @@ import {
   ROUND_TYPE_IDS,
   ROUND_TYPES,
   type RoundType,
+  CLUES_PER_REVEAL_BOUNDS,
+  DEFAULT_CLUES_PER_REVEAL,
+  DEFAULT_PRIVATE_PER_REVEAL,
+  DEFAULT_PRIVATE_START,
+  MARKETS,
+  PRIVATE_PER_REVEAL_BOUNDS,
+  PRIVATE_START_BOUNDS,
   SHOCK_COUNT_BOUNDS,
   STAGE_COUNT,
 } from '../shared/rules.js';
@@ -63,30 +70,46 @@ function HostApp({ code, token }: { code: string; token: string }) {
               <ShockBanner s={s} />
               <ContractCards s={s} />
               <RuleLine rule={s.round.rule} />
-              <div className="strip">
-                <div className="stat">
-                  <div className="k">Public FV</div>
-                  <div className="v">{f1(s.round.publicFv)}</div>
-                </div>
-                <div className="stat">
-                  <div className="k">Last</div>
-                  <div className="v">{s.round.lastPrice ?? '-'}</div>
-                </div>
-                <div className="stat">
-                  <div className="k">Volume</div>
-                  <div className="v">{s.round.volume}</div>
-                </div>
-                <div className="stat">
-                  <div className="k">Quoting</div>
-                  <div className="v">{s.host?.quoting ?? 0}</div>
-                </div>
-              </div>
-              {s.round.settlement !== null && <p>Settled at <strong>{s.round.settlement}</strong>{s.round.insiderId && `; the insider was ${playerName(s, s.round.insiderId)}`}.</p>}
-              <PriceChart s={s} offset={state.offset} />
+              {s.round.marketIds.map((m) => {
+                const mk = s.round!.markets[m]!;
+                return (
+                  <div key={m} className="stack">
+                    {s.round!.marketIds.length > 1 && <h3 style={{ margin: 0 }}>{MARKETS[m].name}</h3>}
+                    <div className="strip">
+                      <div className="stat">
+                        <div className="k">Public FV</div>
+                        <div className="v">{f1(mk.publicFv)}</div>
+                      </div>
+                      <div className="stat">
+                        <div className="k">Last</div>
+                        <div className="v">{mk.lastPrice ?? '-'}</div>
+                      </div>
+                      <div className="stat">
+                        <div className="k">Volume</div>
+                        <div className="v">{mk.volume}</div>
+                      </div>
+                      <div className="stat">
+                        <div className="k">Quoting</div>
+                        <div className="v">{s.host?.quoting[m] ?? 0}</div>
+                      </div>
+                      {mk.settlement !== null && (
+                        <div className="stat">
+                          <div className="k">Settled</div>
+                          <div className="v">{mk.settlement}</div>
+                        </div>
+                      )}
+                    </div>
+                    <PriceChart s={s} offset={state.offset} m={m} />
+                  </div>
+                );
+              })}
+              {s.round.insiderId && <p>The insider was {playerName(s, s.round.insiderId)}.</p>}
             </div>
             <div className="stack">
               <Positions s={s} />
-              <Tape s={s} limit={10} />
+              {s.round.marketIds.map((m) => (
+                <Tape key={m} s={s} m={m} limit={8} />
+              ))}
             </div>
           </div>
         )}
@@ -251,6 +274,49 @@ function TimingSetup({ s, client }: { s: Snapshot; client: GameClient }) {
   );
 }
 
+function InfoSetup({ s, client }: { s: Snapshot; client: GameClient }) {
+  const c = s.config;
+  const set = (cmd: Omit<Extract<Parameters<GameClient['command']>[0], { kind: 'setConfig' }>, 'kind'>) => client.command({ kind: 'setConfig', ...cmd }, { toast: false });
+  const start = c.privateStart ?? DEFAULT_PRIVATE_START;
+  const per = c.privatePerReveal ?? DEFAULT_PRIVATE_PER_REVEAL;
+  const clues = c.cluesPerReveal ?? DEFAULT_CLUES_PER_REVEAL;
+  const product = c.productMarket ?? false;
+  return (
+    <div className="card stack">
+      <h3>Markets and personal information</h3>
+      <div className="stepper">
+        <div style={{ flex: 1 }}>
+          <div>Product market</div>
+          <div className="small muted">A second market on the product of 3 marked cards. Players switch between the two.</div>
+        </div>
+        <div className="seg">
+          <button aria-pressed={product} onClick={() => set({ productMarket: true })}>
+            On
+          </button>
+          <button aria-pressed={!product} onClick={() => set({ productMarket: false })}>
+            Off
+          </button>
+        </div>
+      </div>
+      <Stepper label="Private cards at the open" value={start} show={String} step={1} min={PRIVATE_START_BOUNDS[0]} max={PRIVATE_START_BOUNDS[1]} onSet={(v) => set({ privateStart: v })} />
+      <Stepper label="Private cards at each of the first two reveals" value={per} show={String} step={1} min={PRIVATE_PER_REVEAL_BOUNDS[0]} max={PRIVATE_PER_REVEAL_BOUNDS[1]} onSet={(v) => set({ privatePerReveal: v })} />
+      <Stepper
+        label="Private clues at the open and each of the first two reveals"
+        hint={product ? 'Each clue is about the sum or the product, at random, like "the sum is a multiple of 6".' : 'Clues about the sum, like "the sum is a multiple of 6".'}
+        value={clues}
+        show={String}
+        step={1}
+        min={CLUES_PER_REVEAL_BOUNDS[0]}
+        max={CLUES_PER_REVEAL_BOUNDS[1]}
+        onSet={(v) => set({ cluesPerReveal: v })}
+      />
+      <p className="small muted">
+        Each player ends up with {start + 2 * per} private card{start + 2 * per === 1 ? '' : 's'} and {3 * clues} clue{3 * clues === 1 ? '' : 's'}, all different from their neighbours'. The insider gets 4 extra cards; market makers get nothing.
+      </p>
+    </div>
+  );
+}
+
 function LobbySetup({ s, client }: { s: Snapshot; client: GameClient }) {
   const [hostName, setHostName] = useState('');
   const hostPlayer = s.players.find((p) => p.isHost);
@@ -290,6 +356,7 @@ function LobbySetup({ s, client }: { s: Snapshot; client: GameClient }) {
         <p className="small muted">Players never see fair values during the market; they work them out. The review after each round shows the exact numbers.</p>
       </div>
       <TimingSetup s={s} client={client} />
+      <InfoSetup s={s} client={client} />
       <div className="card stack">
         <h3>Play as well?</h3>
         {hostPlayer ? (
@@ -364,7 +431,8 @@ function PlayersCard({ s, client }: { s: Snapshot; client: GameClient }) {
 }
 
 function Positions({ s }: { s: Snapshot }) {
-  const rows = (s.host?.positions ?? []).slice().sort((a, b) => Math.abs(b.position) - Math.abs(a.position));
+  const multi = (s.round?.marketIds.length ?? 1) > 1;
+  const rows = (s.host?.positions ?? []).slice().sort((a, b) => Math.abs(b.position) / MARKETS[b.market].positionLimit - Math.abs(a.position) / MARKETS[a.market].positionLimit);
   return (
     <div className="card">
       <h3>Positions</h3>
@@ -374,8 +442,11 @@ function Positions({ s }: { s: Snapshot }) {
         <table>
           <tbody>
             {rows.slice(0, 12).map((p) => (
-              <tr key={p.playerId}>
-                <td>{playerName(s, p.playerId)}</td>
+              <tr key={`${p.market}-${p.playerId}`}>
+                <td>
+                  {playerName(s, p.playerId)}
+                  {multi && <span className="small muted"> {MARKETS[p.market].short.toLowerCase()}</span>}
+                </td>
                 <td className={`num ${p.position > 0 ? 'pos' : p.position < 0 ? 'neg' : ''}`}>{p.position > 0 ? `+${p.position}` : p.position}</td>
                 <td className="small">{p.live ? <span className="live">quoting</span> : <span className="muted">no quote</span>}</td>
               </tr>

@@ -24,7 +24,7 @@ describe('session flow', () => {
     expect(h.r.revealed).toBe(PUBLIC_SCHEDULE[3]);
     h.advance(M * 0.25);
     expect(h.room.phase).toBe('results');
-    expect(h.r.settlement).toBe(settlementValue(h.r.contract, h.r.rule));
+    expect(h.r.settlement!.sum).toBe(settlementValue(h.r.contract, h.r.rule));
     h.advance(DEFAULT_DURATIONS.resultsMs);
     expect(h.room.phase).toBe('briefing');
     expect(h.room.roundNumber).toBe(2);
@@ -118,21 +118,21 @@ describe('quotes and trades', () => {
     h.as('p1', { kind: 'setQuote', bid: 67, ask: 71, size: 1 });
     expect(err(() => h.as('p1', { kind: 'trade', targetId: 'p0', side: 'buy', qty: 1, price: 71 }))).toBe('quote_changed');
     h.as('p1', { kind: 'trade', targetId: 'p0', side: 'buy', qty: 2, price: 72 });
-    expect(h.r.positions.p1).toBe(2);
-    expect(h.r.positions.p0).toBe(-2);
-    expect(h.r.cash.p1).toBe(-144);
-    expect(h.r.quotes.p0.askSize).toBe(0);
+    expect(h.b.positions.p1).toBe(2);
+    expect(h.b.positions.p0).toBe(-2);
+    expect(h.b.cash.p1).toBe(-144);
+    expect(h.b.quotes.p0.askSize).toBe(0);
     expect(err(() => h.as('p0', { kind: 'trade', targetId: 'p1', side: 'sell', qty: 1, price: 67 }))).toBe('no_quote');
   });
 
   it('enforces position limits on both sides', () => {
     const h = new Harness(3);
     h.open();
-    h.r.positions.p1 = POSITION_LIMIT - 1;
+    h.b.positions.p1 = POSITION_LIMIT - 1;
     h.as('p0', { kind: 'setQuote', bid: 60, ask: 64, size: 5 });
     h.as('p1', { kind: 'setQuote', bid: 61, ask: 63, size: 1 });
     expect(err(() => h.as('p1', { kind: 'trade', targetId: 'p0', side: 'buy', qty: 2, price: 64 }))).toBe('limit');
-    h.r.positions.p2 = -POSITION_LIMIT;
+    h.b.positions.p2 = -POSITION_LIMIT;
     h.as('p2', { kind: 'setQuote', bid: 62, ask: 63, size: 3 });
     // p2 is already short the limit, so nobody can buy from p2's ask.
     expect(err(() => h.as('p0', { kind: 'trade', targetId: 'p2', side: 'buy', qty: 1, price: 63 }))).toBe('limit_target');
@@ -147,8 +147,8 @@ describe('quotes and trades', () => {
     expect(err(() => h.as(maker, { kind: 'setQuote', bid: 60, ask: 63, size: 1 }))).toBe('too_wide');
     h.as(maker, { kind: 'setQuote', bid: 69, ask: 71, size: 3 });
     h.as(taker, { kind: 'trade', targetId: maker, side: 'sell', qty: 3, price: 69 });
-    expect(h.r.rebates[maker]).toBe(3);
-    expect(h.r.cash[maker]).toBe(-69 * 3 + 3);
+    expect(h.b.rebates[maker]).toBe(3);
+    expect(h.b.cash[maker]).toBe(-69 * 3 + 3);
   });
 
   it('pnl sums to the rebates paid (zero-sum otherwise)', () => {
@@ -182,8 +182,8 @@ describe('quotes and trades', () => {
     h.advance(60_000);
     h.as('p0', { kind: 'pullQuote' });
     h.advance(M);
-    expect(h.r.uptime.p0.ms).toBe(60_000);
-    expect(h.room.reviews.find((x) => x.playerId === 'p0')!.summary.uptime).toBeCloseTo(60_000 / M, 6);
+    expect(h.b.uptime.p0.ms).toBe(60_000);
+    expect(h.room.reviews.find((x) => x.playerId === 'p0')!.markets.sum!.summary.uptime).toBeCloseTo(60_000 / M, 6);
   });
 
   it('tick is a no-op when nothing is due', () => {
@@ -206,16 +206,16 @@ describe('quote cooldown and hidden fair value', () => {
     h.now += 5_000;
     h.as('p0', { kind: 'setQuote', bid: 67, ask: 71, size: 1 });
     const snap = buildSnapshot(h.room, { kind: 'player', playerId: 'p0' }, h.now, () => true);
-    expect(snap.me!.nextQuoteAt).toBe(h.now + 15_000);
+    expect(snap.me!.books.sum!.nextQuoteAt).toBe(h.now + 15_000);
     // No fair values leave the server while the market is open.
-    expect(snap.me!.fv).toBeNull();
-    expect(snap.round!.publicFv).toBeNull();
-    expect(snap.round!.publicFvSeries).toBeNull();
-    expect(buildSnapshot(h.room, { kind: 'spectator' }, h.now, () => true).round!.publicFv).toBeNull();
+    expect(snap.me!.books.sum!.fv).toBeNull();
+    expect(snap.round!.markets.sum!.publicFv).toBeNull();
+    expect(snap.round!.markets.sum!.publicFvSeries).toBeNull();
+    expect(buildSnapshot(h.room, { kind: 'spectator' }, h.now, () => true).round!.markets.sum!.publicFv).toBeNull();
     h.advance(DEFAULT_DURATIONS.marketMs);
     const done = buildSnapshot(h.room, { kind: 'player', playerId: 'p0' }, h.now, () => true);
-    expect(done.me!.fv).not.toBeNull();
-    expect(done.round!.publicFv).not.toBeNull();
+    expect(done.me!.books.sum!.fv).not.toBeNull();
+    expect(done.round!.markets.sum!.publicFv).not.toBeNull();
   });
 
   it('rejects an out-of-range cooldown setting', () => {
@@ -238,10 +238,10 @@ describe('crossing quotes trade automatically', () => {
       ['p1', 70, 1],
     ]);
     expect(h.r.trades.every((t) => t.aggressorId === 'p2' && t.buyerId === 'p2')).toBe(true);
-    expect(h.r.positions.p2).toBe(3);
-    expect(h.r.cash.p2).toBe(-208);
-    expect(h.r.quotes.p2).toMatchObject({ bid: 74, ask: 78, bidSize: 2, askSize: 5 });
-    expect(h.r.quotes.p0.askSize).toBe(0);
+    expect(h.b.positions.p2).toBe(3);
+    expect(h.b.cash.p2).toBe(-208);
+    expect(h.b.quotes.p2).toMatchObject({ bid: 74, ask: 78, bidSize: 2, askSize: 5 });
+    expect(h.b.quotes.p0.askSize).toBe(0);
     expect(res.message).toMatch(/Bought 2 from P0 at 69\. Bought 1 from P1 at 70\. Quoting 74 \/ 78/);
   });
 
@@ -252,19 +252,19 @@ describe('crossing quotes trade automatically', () => {
     h.as('p1', { kind: 'setQuote', bid: 66, ask: 70, size: 1 });
     expect(h.r.trades).toHaveLength(1);
     expect(h.r.trades[0]).toMatchObject({ buyerId: 'p0', sellerId: 'p1', price: 72, qty: 1 });
-    expect(h.r.quotes.p1).toMatchObject({ bidSize: 1, askSize: 0 });
-    expect(h.r.quotes.p0.bidSize).toBe(2);
+    expect(h.b.quotes.p1).toMatchObject({ bidSize: 1, askSize: 0 });
+    expect(h.b.quotes.p0.bidSize).toBe(2);
   });
 
   it('respects position limits and does not leave a crossed book', () => {
     const h = new Harness(3);
     h.open();
-    h.r.positions.p2 = 9;
+    h.b.positions.p2 = 9;
     h.as('p0', { kind: 'setQuote', bid: 65, ask: 69, size: 5 });
     h.as('p2', { kind: 'setQuote', bid: 74, ask: 78, size: 5 });
-    expect(h.r.positions.p2).toBe(10);
-    expect(h.r.quotes.p2.bidSize).toBe(0);
-    expect(h.r.quotes.p2.askSize).toBe(5);
+    expect(h.b.positions.p2).toBe(10);
+    expect(h.b.quotes.p2.bidSize).toBe(0);
+    expect(h.b.quotes.p2.askSize).toBe(5);
   });
 
   it('has no quote cooldown unless the host sets one', () => {
@@ -272,7 +272,7 @@ describe('crossing quotes trade automatically', () => {
     h.open();
     h.as('p0', { kind: 'setQuote', bid: 68, ask: 72, size: 1 });
     h.as('p0', { kind: 'setQuote', bid: 69, ask: 73, size: 1 });
-    expect(h.r.quotes.p0.bid).toBe(69);
+    expect(h.b.quotes.p0.bid).toBe(69);
   });
 });
 

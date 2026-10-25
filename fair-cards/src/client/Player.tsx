@@ -1,7 +1,8 @@
-import { POSITION_LIMIT, ROUND_TYPES } from '../shared/rules.js';
+import { useState } from 'react';
+import { type MarketId, MARKETS, ROUND_TYPES } from '../shared/rules.js';
 import type { Snapshot } from '../shared/types.js';
 import { PriceChart } from './Chart.js';
-import { Card, ConnBanner, ContractCards, playerName, ROLE_LABEL, RuleLine, roundTitle, ShockBanner, Standings, Toasts, TopBar, useClient, useNow } from './common.js';
+import { Card, ClueList, ConnBanner, ContractCards, MarketTabs, playerName, ROLE_LABEL, RuleLine, roundTitle, ShockBanner, Standings, Toasts, TopBar, useClient, useNow } from './common.js';
 import { Book, QuotePanel, Tape } from './Market.js';
 import { creds } from './net.js';
 import { RoundReview, SessionReport } from './Review.js';
@@ -10,6 +11,7 @@ import { RulesSummary } from './Rules.js';
 export function PlayerPage({ code }: { code: string }) {
   const token = creds.get('player', code);
   const [client, state] = useClient(code, token, false);
+  const [tab, setTab] = useState<MarketId>('sum');
   const s = state.snapshot;
   if (!token) {
     return (
@@ -30,6 +32,7 @@ export function PlayerPage({ code }: { code: string }) {
     );
   }
   const myName = playerName(s, s.you.playerId);
+  const m: MarketId = s.round?.marketIds.includes(tab) ? tab : 'sum';
   return (
     <>
       <TopBar state={state} title={s.you.kind === 'player' ? myName : `Watching ${code}`} />
@@ -42,14 +45,16 @@ export function PlayerPage({ code }: { code: string }) {
           <div className="grid2">
             <div className="stack">
               <InfoCard s={s} />
-              {s.me && <QuotePanel key={s.round.number} s={s} client={client} offset={state.offset} />}
             </div>
             <div className="stack">
-              <Book s={s} client={client} />
+              <MarketTabs s={s} value={m} onChange={setTab} />
+              {s.round.marketIds.length > 1 && <p className="small muted" style={{ margin: 0 }}>{MARKETS[m].name} pays {MARKETS[m].pays}.</p>}
+              {s.me && <QuotePanel key={`${s.round.number}-${m}`} s={s} client={client} offset={state.offset} m={m} />}
+              <Book key={m} s={s} client={client} m={m} />
               <div className="card">
-                <PriceChart s={s} offset={state.offset} />
+                <PriceChart s={s} offset={state.offset} m={m} />
               </div>
-              <Tape s={s} />
+              <Tape s={s} m={m} />
             </div>
           </div>
         )}
@@ -102,7 +107,7 @@ function Briefing({ s }: { s: Snapshot }) {
         <div className="banner warn">
           Your role: <span className="role">{ROLE_LABEL[me.role]}</span>
           {me.role === 'maker' && ' You see no private cards. Quote at most 2 wide and earn a rebate on every fill. Watch who trades with you.'}
-          {me.role === 'taker' && ' You get private cards. You cannot quote; pick off makers whose prices are wrong.'}
+          {me.role === 'taker' && ' You get private cards and clues. You cannot quote; pick off makers whose prices are wrong.'}
           {me.isInsider && ' You are the insider: you start with 5 private cards. Use them without being obvious.'}
         </div>
       )}
@@ -114,10 +119,8 @@ function Briefing({ s }: { s: Snapshot }) {
 function InfoCard({ s }: { s: Snapshot }) {
   const r = s.round!;
   const me = s.me;
-  const pos = me?.position ?? 0;
-  const pnlAtLast = me && r.lastPrice !== null ? me.cash + pos * r.lastPrice : null;
   const now = useNow(1000);
-  const uptimePct = me && r.startedAt ? Math.min(100, Math.round((me.uptimeMs / Math.max(1, Math.min(now, r.endsAt ?? now) - r.startedAt)) * 100)) : null;
+  const prod = new Set(r.productKnown);
   return (
     <div className="card stack">
       <div className="spread">
@@ -127,7 +130,7 @@ function InfoCard({ s }: { s: Snapshot }) {
       <ShockBanner s={s} />
       <div>
         <div className="small muted">
-          Contract: {r.publicCards.length} of {r.contractSize} cards public
+          Contract: {r.publicCards.length} of {r.contractSize} cards public{r.productCount ? `; ${r.productCount} are product cards (P)` : ''}
         </div>
         <ContractCards s={s} mine={me?.privateCards} />
         <RuleLine rule={r.rule} />
@@ -136,44 +139,59 @@ function InfoCard({ s }: { s: Snapshot }) {
         <div>
           <div className="small muted">Your private cards {me.isInsider && '(insider)'}</div>
           <div className="cards">
-            {me.privateCards.length ? me.privateCards.map((c) => <Card key={c} id={c} rule={r.rule} mine />) : <span className="small muted">None{me.role === 'maker' ? ': makers trade blind' : ''}</span>}
+            {me.privateCards.length ? (
+              me.privateCards.map((c) => <Card key={c} id={c} rule={r.rule} mine product={prod.has(c)} />)
+            ) : (
+              <span className="small muted">None{me.role === 'maker' ? ': makers trade blind' : ''}</span>
+            )}
           </div>
         </div>
       )}
-      <div className="strip">
-        <div className="stat">
-          <div className="k">Last trade</div>
-          <div className="v">{r.lastPrice ?? '-'}</div>
-        </div>
-        {me && (
-          <div className={`stat ${Math.abs(pos) >= POSITION_LIMIT - 2 ? 'warn' : ''}`}>
-            <div className="k">Position</div>
-            <div className={`v ${pos > 0 ? 'pos' : pos < 0 ? 'neg' : ''}`}>
-              {pos > 0 ? `+${pos}` : pos} <span className="small muted">/ {POSITION_LIMIT}</span>
+      {me && <ClueList clues={me.clues} />}
+      {me &&
+        r.marketIds.map((m) => {
+          const b = me.books[m]!;
+          const spec = MARKETS[m];
+          const last = r.markets[m]!.lastPrice;
+          const pnlAtLast = last !== null ? b.cash + b.position * last : null;
+          const uptimePct = r.startedAt ? Math.min(100, Math.round((b.uptimeMs / Math.max(1, Math.min(now, r.endsAt ?? now) - r.startedAt)) * 100)) : null;
+          return (
+            <div key={m}>
+              {r.marketIds.length > 1 && <div className="small muted">{spec.name}</div>}
+              <div className="strip">
+                <div className="stat">
+                  <div className="k">Last trade</div>
+                  <div className="v">{last ?? '-'}</div>
+                </div>
+                <div className={`stat ${Math.abs(b.position) >= spec.inventoryWarn ? 'warn' : ''}`}>
+                  <div className="k">Position</div>
+                  <div className={`v ${b.position > 0 ? 'pos' : b.position < 0 ? 'neg' : ''}`}>
+                    {b.position > 0 ? `+${b.position}` : b.position} <span className="small muted">/ {spec.positionLimit}</span>
+                  </div>
+                </div>
+                <div className="stat">
+                  <div className="k">Cash</div>
+                  <div className="v">{b.cash}</div>
+                </div>
+                {pnlAtLast !== null && (
+                  <div className="stat">
+                    <div className="k">P&L at last</div>
+                    <div className={`v ${pnlAtLast > 0 ? 'pos' : pnlAtLast < 0 ? 'neg' : ''}`}>{pnlAtLast}</div>
+                  </div>
+                )}
+                {me.role !== 'taker' && uptimePct !== null && (
+                  <div className="stat">
+                    <div className="k">Uptime</div>
+                    <div className="v">{uptimePct}%</div>
+                  </div>
+                )}
+              </div>
             </div>
-          </div>
-        )}
-        {me && (
-          <div className="stat">
-            <div className="k">Cash</div>
-            <div className="v">{me.cash}</div>
-          </div>
-        )}
-        {pnlAtLast !== null && (
-          <div className="stat">
-            <div className="k">P&L at last trade</div>
-            <div className={`v ${pnlAtLast > 0 ? 'pos' : pnlAtLast < 0 ? 'neg' : ''}`}>{pnlAtLast}</div>
-          </div>
-        )}
-        {me && me.role !== 'taker' && uptimePct !== null && (
-          <div className="stat">
-            <div className="k">Quoting uptime</div>
-            <div className="v">{uptimePct}%</div>
-          </div>
-        )}
-      </div>
+          );
+        })}
       <p className="small muted">
-        Work out your own fair value from the cards you can see. A full deck adds up to 364 (average 7 a card). Score = cash + position x settlement.
+        Work out your own fair values from the cards and clues you have. A full deck adds up to 364 (average 7 a card)
+        {r.productCount ? '; three random cards multiply to about 337 on average, but usually less (half the time under 210)' : ''}. Score = cash + position x settlement, in each market.
       </p>
     </div>
   );
@@ -188,7 +206,7 @@ function Results({ s, offset }: { s: Snapshot; offset: number }) {
     <div className="stack">
       <div className="card stack">
         <h1>
-          Settled at {r.settlement}
+          {r.marketIds.map((m) => `${r.marketIds.length > 1 ? `${MARKETS[m].short} ` : 'Settled at '}${r.markets[m]!.settlement}`).join(' · ')}
           {pnl !== undefined && (
             <span className={pnl > 0 ? 'pos' : pnl < 0 ? 'neg' : ''} style={{ marginLeft: 16 }}>
               you {pnl >= 0 ? '+' : ''}
@@ -199,7 +217,12 @@ function Results({ s, offset }: { s: Snapshot; offset: number }) {
         <ContractCards s={s} mine={s.me?.privateCards} />
         <RuleLine rule={r.rule} />
         {r.insiderId && <p>The insider was {r.insiderId === s.you.playerId ? 'you' : playerName(s, r.insiderId)}.</p>}
-        <PriceChart s={s} offset={offset} />
+        {r.marketIds.map((m) => (
+          <div key={m}>
+            {r.marketIds.length > 1 && <h3>{MARKETS[m].name}</h3>}
+            <PriceChart s={s} offset={offset} m={m} />
+          </div>
+        ))}
       </div>
       {mine && <RoundReview r={mine} s={s} />}
       <Standings s={s} />

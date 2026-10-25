@@ -54,7 +54,7 @@ describe('room manager', () => {
     expect(after.round!.trades).toEqual(before.round!.trades);
     expect(after.round!.decisions).toEqual(before.round!.decisions);
     expect(after.round!.infoEvents).toEqual(before.round!.infoEvents);
-    expect(after.round!.positions).toEqual(before.round!.positions);
+    expect(after.round!.books.sum!.positions).toEqual(before.round!.books.sum!.positions);
     // Receipt survives the restart.
     expect(await m.command(room.id, B, 't1', { kind: 'trade', targetId: a.id, side: 'buy', qty: 1, price: 72 })).toEqual(t1);
     expect(m.getRoom(room.id)!.round!.trades).toHaveLength(1);

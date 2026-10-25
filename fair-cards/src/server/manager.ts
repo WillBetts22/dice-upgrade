@@ -2,7 +2,7 @@ import { createHash, randomInt, randomUUID } from 'node:crypto';
 import type { PlayerRoundReview } from '../shared/review.js';
 import type { Command, Receipt, Round } from '../shared/types.js';
 import type { Db, Queryable } from './db.js';
-import { type Actor, addPlayer, applyCommand, type Ctx, EngineError, newRoomState, nextDue, type Player, type RoomState, tick } from './engine.js';
+import { type Actor, addPlayer, applyCommand, type Ctx, EngineError, newRoomState, nextDue, type Player, type RoomState, tick, upgradeRoom } from './engine.js';
 
 export interface Clock {
   now(): number;
@@ -90,6 +90,7 @@ export class RoomManager {
     const rv = await this.db.query<{ data: any }>(`SELECT data FROM fc_reviews WHERE room_id=$1 ORDER BY round_number, player_id`, [id]);
     room.reviews = rv.rows.map((x) => (typeof x.data === 'string' ? JSON.parse(x.data) : x.data) as PlayerRoundReview);
     p.reviews = room.reviews.length;
+    upgradeRoom(room);
     this.rooms.set(id, room);
     this.codes.set(room.code, id);
     this.persisted.set(id, p);

@@ -35,8 +35,6 @@ export const MAX_PLAYERS = 30;
 export const CONTRACT_SIZE = 10;
 /** Cumulative public cards after each information stage. */
 export const PUBLIC_SCHEDULE = [0, 2, 4, 7];
-/** New private cards per player at each stage. */
-export const PRIVATE_SCHEDULE = [1, 1, 1, 0];
 export const STAGE_COUNT = PUBLIC_SCHEDULE.length;
 /** Time between information stages; stage k starts k intervals into the market. */
 export const DEFAULT_REVEAL_EVERY_MS = 120_000;
@@ -50,6 +48,76 @@ export const SHOCK_COUNT_BOUNDS: [number, number] = [1, 6];
 export const SHOCK_JITTER = 0.04;
 /** Shocks keep at least this fraction of the market away from a reveal. */
 export const SHOCK_GAP = 0.04;
+
+export type MarketId = 'sum' | 'product';
+export const MARKET_IDS: MarketId[] = ['sum', 'product'];
+export const PRODUCT_CARDS = 3;
+
+export interface MarketSpec {
+  name: string;
+  short: string;
+  pays: string;
+  maxWidth: number;
+  makerWidth: number;
+  maxSize: number;
+  positionLimit: number;
+  rebate: number;
+  priceMax: number;
+  /** Where a fresh quote box starts. */
+  startMid: number;
+  /** Review thresholds, in this market's coins. */
+  edgeNoise: number;
+  missedEdge: number;
+  staleSlack: number;
+  inventoryWarn: number;
+}
+
+export const MARKETS: Record<MarketId, MarketSpec> = {
+  sum: {
+    name: 'Sum market',
+    short: 'Sum',
+    pays: 'the sum of all the contract cards',
+    maxWidth: 4,
+    makerWidth: 2,
+    maxSize: 5,
+    positionLimit: 10,
+    rebate: 1,
+    priceMax: 400,
+    startMid: 70,
+    edgeNoise: 1,
+    missedEdge: 3,
+    staleSlack: 0.5,
+    inventoryWarn: 8,
+  },
+  product: {
+    name: 'Product market',
+    short: 'Product',
+    pays: 'the product of the 3 product cards',
+    maxWidth: 40,
+    makerWidth: 20,
+    maxSize: 3,
+    positionLimit: 3,
+    rebate: 5,
+    priceMax: 20_000,
+    startMid: 300,
+    edgeNoise: 15,
+    missedEdge: 40,
+    staleSlack: 10,
+    inventoryWarn: 3,
+  },
+};
+
+export const DEFAULT_PRODUCT_MARKET = true;
+
+/** Personal information the host can dial up or down. */
+export const DEFAULT_PRIVATE_START = 1;
+export const PRIVATE_START_BOUNDS: [number, number] = [0, 5];
+export const DEFAULT_PRIVATE_PER_REVEAL = 1;
+export const PRIVATE_PER_REVEAL_BOUNDS: [number, number] = [0, 3];
+export const DEFAULT_CLUES_PER_REVEAL = 1;
+export const CLUES_PER_REVEAL_BOUNDS: [number, number] = [0, 3];
+/** Private cards and clues are dealt at the open and the first two reveals. */
+export const PERSONAL_STAGES = 3;
 
 export const MAX_WIDTH = 4;
 /** Minimum time between a player's quote posts. Off unless the host turns it on. */
@@ -106,5 +174,6 @@ export const HOST_SCRIPT = `Fair Cards in five minutes.
 3. You trade by quoting: a bid (the price you will buy at) and an ask (the price you will sell at), at most 4 apart. Others can buy from your ask or sell to your bid. You can only trade with others while your own quote is live.
 4. Score = cash + position x settlement. You can go long or short up to 10 lots. Positions reset each round.
 5. Watch the chart: trades should find the true value before the public cards do. That is price discovery.
-6. Later rounds add designated market makers, surprise news, and a hidden insider.
-7. After each round you get a review of every decision: what each trade was worth given what you knew, and what you could have done better.`;
+6. There can be a second market on the product of 3 marked "product cards". Same cards, a different calculation: your information may be worth more in one market than the other. You may also get private clues such as "the sum is a multiple of 6".
+7. Later rounds add designated market makers, surprise news, and a hidden insider.
+8. After each round you get a review of every decision: what each trade was worth given what you knew, and what you could have done better.`;

@@ -5,8 +5,11 @@ export class Harness {
   now = 1_000_000;
   room: RoomState;
   private n = 0;
-  constructor(players: number, opts: { types?: RoomState['config']['roundTypes']; seed?: number; cooldownMs?: number } = {}) {
+  /** By default the classic single sum market with no clues, so fair values are exact. */
+  constructor(players: number, opts: { types?: RoomState['config']['roundTypes']; seed?: number; cooldownMs?: number; product?: boolean; clues?: number } = {}) {
     this.room = newRoomState({ id: 'room', code: 'TEST1', hostHash: 'h', devMode: true, now: this.now });
+    this.room.config.productMarket = opts.product ?? false;
+    this.room.config.cluesPerReveal = opts.clues ?? 0;
     if (opts.types) this.room.config.roundTypes = opts.types;
     if (opts.cooldownMs !== undefined) this.room.config.quoteCooldownMs = opts.cooldownMs;
     this.seedValue = opts.seed ?? 12345;
@@ -35,5 +38,12 @@ export class Harness {
   }
   get r() {
     return this.room.round!;
+  }
+  /** The sum market's book. */
+  get b() {
+    return this.room.round!.books.sum!;
+  }
+  get p() {
+    return this.room.round!.books.product!;
   }
 }

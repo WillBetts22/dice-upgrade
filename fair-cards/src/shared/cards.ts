@@ -54,6 +54,32 @@ export function fairValue(known: Iterable<number>, contractSize: number, rule: V
   return rule.offset + knownSum + (unknown > 0 ? (unknown * restSum) / (DECK_SIZE - k.size) : 0);
 }
 
+/** What the product market pays: the product of the product cards' values (offsets do not apply). */
+export function productValue(cards: number[], rule: ValueRule): number {
+  return cards.reduce((a, c) => a * cardValue(c, rule), 1);
+}
+
+/** Exact expected product of k values drawn without replacement, via elementary symmetric polynomials. */
+export function expectedProduct(values: number[], k: number): number {
+  if (k <= 0) return 1;
+  if (values.length < k) return 0;
+  const e = [1, ...Array<number>(k).fill(0)];
+  for (const v of values) for (let j = k; j >= 1; j--) e[j] += e[j - 1] * v;
+  let combos = 1;
+  for (let i = 0; i < k; i++) combos = (combos * (values.length - i)) / (i + 1);
+  return e[k] / combos;
+}
+
+/**
+ * Exact expected product-market settlement for a viewer who knows `known` cards,
+ * `knownProduct` of which are product cards; the other product cards are a uniform draw from the unseen deck.
+ */
+export function productFairValue(known: Iterable<number>, knownProduct: number[], productCount: number, rule: ValueRule): number {
+  const k = new Set(known);
+  const pool = DECK.filter((id) => !k.has(id)).map((id) => cardValue(id, rule));
+  return productValue(knownProduct, rule) * expectedProduct(pool, productCount - knownProduct.length);
+}
+
 export type ShockId = 'faces_double' | 'aces_high' | 'red_zero' | 'bonus' | 'penalty' | 'extra_cards';
 
 export const EXTRA_CARDS = 2;

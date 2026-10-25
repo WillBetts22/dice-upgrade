@@ -1,7 +1,7 @@
 // Decision review: every trade and quote valued against the player's exact fair value at the time.
 import { cardLabel, SHOCKS } from './cards.js';
-import { EDGE_NOISE, MISSED_EDGE, MISSED_WINDOW_MS, STALE_MS } from './rules.js';
-import type { InfoEvent, Round } from './types.js';
+import { type MarketId, MARKETS, MISSED_WINDOW_MS, STALE_MS } from './rules.js';
+import type { Decision, MarketSnap, Role, Trade } from './types.js';
 
 export type Verdict = 'good' | 'ok' | 'bad' | 'missed' | 'info';
 
@@ -19,7 +19,7 @@ export interface ReviewItem {
 }
 
 /**
- * Exact identity: pnl = decisionEdge + infoLuck, where decisionEdge sums every fill's
+ * Exact identity per market and in total: pnl = decisionEdge + infoLuck, where decisionEdge sums every fill's
  * (your fair value - price) x lots x direction plus rebates, and infoLuck sums
  * (settlement - your fair value) x lots x direction.
  */
@@ -27,6 +27,11 @@ export interface PlayerRoundReview {
   roundNumber: number;
   playerId: string;
   startedAt: number;
+  markets: Partial<Record<MarketId, MarketReview>>;
+  summary: { pnl: number; decisionEdge: number; infoLuck: number; goodCount: number; badCount: number };
+}
+
+export interface MarketReview {
   items: ReviewItem[];
   summary: {
     pnl: number;
@@ -56,29 +61,67 @@ function clock(at: number, start: number): string {
   return `${Math.floor(s / 60)}:${String(s % 60).padStart(2, '0')}`;
 }
 
-function verdictOf(ev: number): Verdict {
-  return ev >= EDGE_NOISE ? 'good' : ev <= -EDGE_NOISE ? 'bad' : 'ok';
+/** One market's slice of a round, flattened for the analyzer. */
+export interface ReviewInfo extends MarketSnap {
+  at: number;
+  kind: 'stage' | 'shock';
+  stage?: number;
+  shock?: import('./cards.js').ShockId;
+  publicNew: number[];
 }
 
-function eventName(e: InfoEvent, start: number): string {
+export interface ReviewRound {
+  number: number;
+  participants: string[];
+  roles: Record<string, Role>;
+  startedAt: number;
+  endsAt: number;
+  activeMs: number | null;
+  settlement: number;
+  trades: Trade[];
+  decisions: Decision[];
+  infoEvents: ReviewInfo[];
+  positions: Record<string, number>;
+  cash: Record<string, number>;
+  uptime: Record<string, { ms: number; since: number | null }>;
+}
+
+function eventName(e: ReviewInfo, start: number): string {
   if (e.kind === 'shock') return `the "${SHOCKS[e.shock!].label}" news at ${clock(e.at, start)}`;
   if (e.stage === 0) return 'the opening deal';
   return `the ${clock(e.at, start)} reveal${e.publicNew.length ? ` (${e.publicNew.map(cardLabel).join(' ')})` : ''}`;
 }
 
 export interface AnalyzeInput {
-  round: Round;
+  round: ReviewRound;
+  market: MarketId;
   names: Record<string, string>;
   /** Fair value of each participant just before the final reveal. */
   fvAtClose: Record<string, number>;
 }
 
-export function analyzeRound({ round: r, names, fvAtClose }: AnalyzeInput): PlayerRoundReview[] {
-  const S = r.settlement!;
-  const start = r.startedAt!;
-  const end = r.endsAt!;
+/** Add up a player's market reviews into one round review. */
+export function combineReviews(roundNumber: number, playerId: string, startedAt: number, markets: Partial<Record<MarketId, MarketReview>>): PlayerRoundReview {
+  const all = Object.values(markets) as MarketReview[];
+  const t = (f: (m: MarketReview['summary']) => number) => all.reduce((a, m) => a + f(m.summary), 0);
+  return {
+    roundNumber,
+    playerId,
+    startedAt,
+    markets,
+    summary: { pnl: t((s) => s.pnl), decisionEdge: t((s) => s.decisionEdge), infoLuck: t((s) => s.infoLuck), goodCount: t((s) => s.goodCount), badCount: t((s) => s.badCount) },
+  };
+}
+
+export function analyzeMarket({ round: r, market, names, fvAtClose }: AnalyzeInput): Record<string, MarketReview> {
+  const spec = MARKETS[market];
+  const verdictOf = (ev: number): Verdict => (ev >= spec.edgeNoise ? 'good' : ev <= -spec.edgeNoise ? 'bad' : 'ok');
+  const half = Math.max(1, Math.floor(spec.maxWidth / 2));
+  const S = r.settlement;
+  const start = r.startedAt;
+  const end = r.endsAt;
   const name = (id: string) => names[id] ?? '?';
-  const out: PlayerRoundReview[] = [];
+  const out: Record<string, MarketReview> = {};
 
   for (const pid of r.participants) {
     const items: ReviewItem[] = [];
@@ -130,7 +173,7 @@ export function analyzeRound({ round: r, names, fvAtClose }: AnalyzeInput): Play
         detail = `${name(cpId)} ${buyer ? 'sold to your bid' : 'bought from your ask'} at ${t.price} on your ${quoteText} quote. ${knew}, worth ${signed(edgeThen)}${rebate ? ` including a ${rebate} coin rebate` : ''}. ${settled}${cpNote}`;
         if (verdict === 'good') detail = `Earned the spread. ${detail}`;
         if (verdict === 'bad') {
-          if (containedAtPost && Math.abs(fv - t.restingFvAtPost) >= 0.5) {
+          if (containedAtPost && Math.abs(fv - t.restingFvAtPost) >= spec.staleSlack) {
             detail = `Picked off on a stale quote. You posted ${quoteText} when your fair value was ${f1(t.restingFvAtPost)}; by the fill it was ${f1(fv)}. ${detail}`;
             better = 'Move or pull your quote right after every reveal or news event.';
           } else {
@@ -174,7 +217,7 @@ export function analyzeRound({ round: r, names, fvAtClose }: AnalyzeInput): Play
         evThen: null,
         evFinal: null,
         verdict: skewing ? 'ok' : 'bad',
-        better: skewing ? undefined : `Quote around ${Math.round(d.fv) - 2}/${Math.round(d.fv) + 2} instead.`,
+        better: skewing ? undefined : `Quote around ${Math.round(d.fv) - half}/${Math.round(d.fv) + half} instead.`,
       });
     }
 
@@ -183,7 +226,7 @@ export function analyzeRound({ round: r, names, fvAtClose }: AnalyzeInput): Play
       const fv = e.fvAfter[pid];
       if (fv === undefined) continue;
       const q = e.quotes[pid];
-      if (q && role !== 'taker' && (fv < q.bid - 0.5 || fv > q.ask + 0.5)) {
+      if (q && role !== 'taker' && (fv < q.bid - spec.staleSlack || fv > q.ask + spec.staleSlack)) {
         const next = myDecisions.find((d) => d.at > e.at);
         const until = next ? next.at : end;
         const lag = until - e.at;
@@ -215,7 +258,7 @@ export function analyzeRound({ round: r, names, fvAtClose }: AnalyzeInput): Play
       const buyEdge = bestAsk ? fv - bestAsk.px : -Infinity;
       const sellEdge = bestBid ? bestBid.px - fv : -Infinity;
       const edge = Math.max(buyEdge, sellEdge);
-      if (edge < MISSED_EDGE) continue;
+      if (edge < spec.missedEdge) continue;
       const buy = buyEdge >= sellEdge;
       const other = buy ? bestAsk! : bestBid!;
       const acted = mine.some((t) => t.aggressorId === pid && t.at > e.at && t.at <= e.at + MISSED_WINDOW_MS && (t.buyerId === pid) === buy);
@@ -226,7 +269,7 @@ export function analyzeRound({ round: r, names, fvAtClose }: AnalyzeInput): Play
         at: e.at,
         kind: 'missed',
         title: `Missed: ${name(other.id)} was ${buy ? 'asking' : 'bidding'} ${other.px} with your fair value at ${f1(fv)}`,
-        detail: `After ${eventName(e, start)}, ${buy ? 'buying 1 lot from' : 'selling 1 lot to'} ${name(other.id)} was worth ${signed(edge)} to you, and you did not take it within ${MISSED_WINDOW_MS / 1000} s.${(buy && pos >= 8) || (!buy && pos <= -8) ? ` You were already ${pos > 0 ? 'long' : 'short'} ${Math.abs(pos)}, so passing was defensible.` : ''}`,
+        detail: `After ${eventName(e, start)}, ${buy ? 'buying 1 lot from' : 'selling 1 lot to'} ${name(other.id)} was worth ${signed(edge)} to you, and you did not take it within ${MISSED_WINDOW_MS / 1000} s.${(buy && pos >= spec.inventoryWarn) || (!buy && pos <= -spec.inventoryWarn) ? ` You were already ${pos > 0 ? 'long' : 'short'} ${Math.abs(pos)}, so passing was defensible.` : ''}`,
         evThen: edge,
         evFinal: null,
         verdict: 'missed',
@@ -236,7 +279,7 @@ export function analyzeRound({ round: r, names, fvAtClose }: AnalyzeInput): Play
 
     const pos = r.positions[pid] ?? 0;
     const fvClose = fvAtClose[pid];
-    if (Math.abs(pos) >= 8) {
+    if (Math.abs(pos) >= spec.inventoryWarn) {
       items.push({
         at: end,
         kind: 'inventory',
@@ -252,10 +295,7 @@ export function analyzeRound({ round: r, names, fvAtClose }: AnalyzeInput): Play
     items.sort((a, b) => a.at - b.at);
     const u = r.uptime[pid];
     const pnl = (r.cash[pid] ?? 0) + pos * S;
-    out.push({
-      roundNumber: r.number,
-      playerId: pid,
-      startedAt: start,
+    out[pid] = {
       items,
       summary: {
         pnl,
@@ -273,7 +313,7 @@ export function analyzeRound({ round: r, names, fvAtClose }: AnalyzeInput): Play
         goodCount: items.filter((i) => i.verdict === 'good').length,
         badCount: items.filter((i) => i.verdict === 'bad').length,
       },
-    });
+    };
   }
   return out;
 }

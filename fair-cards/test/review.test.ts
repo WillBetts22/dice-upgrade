@@ -37,16 +37,16 @@ describe('decision review', () => {
         const res = h.room.results[0];
         expect(h.room.reviews).toHaveLength(8);
         for (const rv of h.room.reviews) {
-          const s = rv.summary;
+          const s = rv.markets.sum!.summary;
           expect(s.pnl).toBe(res.pnl[rv.playerId]);
           expect(s.decisionEdge + s.infoLuck).toBeCloseTo(s.pnl, 9);
           expect(s.aggressiveEdge + s.passiveEdge).toBeCloseTo(s.decisionEdge, 9);
           // Each fill row's final value adds up to the round result.
-          const fills = rv.items.filter((i) => ['buy', 'sell', 'fill_buy', 'fill_sell'].includes(i.kind));
+          const fills = rv.markets.sum!.items.filter((i) => ['buy', 'sell', 'fill_buy', 'fill_sell'].includes(i.kind));
           expect(fills.reduce((a, i) => a + i.evFinal!, 0)).toBeCloseTo(s.pnl, 9);
         }
         const total = Object.values(res.pnl).reduce((a, b) => a + b, 0);
-        const rebates = Object.values(h.r.rebates).reduce((a, b) => a + b, 0);
+        const rebates = Object.values(h.b.rebates).reduce((a, b) => a + b, 0);
         expect(total).toBe(rebates);
       }
     });
@@ -59,7 +59,7 @@ describe('decision review', () => {
     const bid = Math.round(fv) + 5;
     h.as('p0', { kind: 'setQuote', bid, ask: bid + 2, size: 1 });
     h.advance(M);
-    const items = h.room.reviews.find((r) => r.playerId === 'p0')!.items;
+    const items = h.room.reviews.find((r) => r.playerId === 'p0')!.markets.sum!.items;
     const q = items.find((i) => i.kind === 'quote' && i.verdict === 'bad');
     expect(q).toBeTruthy();
     expect(q!.better).toMatch(/Quote around/);
@@ -81,7 +81,7 @@ describe('decision review', () => {
         h.advance(20_000);
         h.as('p1', { kind: 'trade', targetId: 'p0', side: 'buy', qty: 1, price: bid + 2 });
         h.advance(M);
-        const items = h.room.reviews.find((r) => r.playerId === 'p0')!.items;
+        const items = h.room.reviews.find((r) => r.playerId === 'p0')!.markets.sum!.items;
         expect(items.some((i) => i.kind === 'stale' && i.verdict === 'bad')).toBe(true);
         const fill = items.find((i) => i.kind === 'fill_sell')!;
         expect(fill.verdict).toBe('bad');
@@ -101,7 +101,7 @@ describe('decision review', () => {
       h.advance(M * 0.25);
       if (playerFv(h.r, 'p0') - 62 >= 4) {
         h.advance(M);
-        const items = h.room.reviews.find((r) => r.playerId === 'p0')!.items;
+        const items = h.room.reviews.find((r) => r.playerId === 'p0')!.markets.sum!.items;
         const m = items.find((i) => i.kind === 'missed');
         expect(m).toBeTruthy();
         expect(m!.evThen!).toBeGreaterThanOrEqual(3);

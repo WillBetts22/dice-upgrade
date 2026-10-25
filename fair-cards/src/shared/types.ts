@@ -1,6 +1,7 @@
 import type { ShockId, ValueRule } from './cards.js';
+import type { Clue } from './clues.js';
 import type { PlayerRoundReview } from './review.js';
-import type { Durations, RoundType } from './rules.js';
+import type { Durations, MarketId, RoundType } from './rules.js';
 
 export type Phase = 'lobby' | 'briefing' | 'market' | 'results' | 'finished';
 export type Role = 'trader' | 'maker' | 'taker';
@@ -15,6 +16,14 @@ export interface RoomConfig extends Durations {
   revealEveryMs: number;
   /** News shocks in each news round. */
   shockCount: number;
+  /** Run a second market on the product of the 3 product cards. */
+  productMarket: boolean;
+  /** Private cards each player gets when the market opens. */
+  privateStart: number;
+  /** Private cards each player gets at each of the first two reveals. */
+  privatePerReveal: number;
+  /** Personal clues each player gets at the open and at each of the first two reveals. */
+  cluesPerReveal: number;
 }
 
 export interface Quote {
@@ -31,6 +40,7 @@ export interface Quote {
 
 export interface Trade {
   id: string;
+  market: MarketId;
   seq: number;
   at: number;
   buyerId: string;
@@ -52,6 +62,7 @@ export interface Trade {
 
 /** Quote changes, logged with the player's state at the time. Trades are logged separately. */
 export interface Decision {
+  market: MarketId;
   at: number;
   playerId: string;
   kind: 'quote' | 'pull';
@@ -70,17 +81,34 @@ export interface QuoteSides {
   askSize: number;
 }
 
-/** An information drop or shock, with every participant's fair value right after it. */
+/** One market's state right after an information event. */
+export interface MarketSnap {
+  fvAfter: Record<string, number>;
+  publicFvAfter: number;
+  quotes: Record<string, QuoteSides>;
+  positions: Record<string, number>;
+}
+
+/** An information drop or shock, with every participant's fair value in each market right after it. */
 export interface InfoEvent {
   at: number;
   kind: 'stage' | 'shock';
   stage?: number;
   shock?: ShockId;
   publicNew: number[];
-  fvAfter: Record<string, number>;
-  publicFvAfter: number;
-  quotes: Record<string, QuoteSides>;
+  m: Partial<Record<MarketId, MarketSnap>>;
+}
+
+/** Live state of one market. Trades and decisions live on the round, tagged by market. */
+export interface Book {
+  quotes: Record<string, Quote>;
   positions: Record<string, number>;
+  cash: Record<string, number>;
+  rebates: Record<string, number>;
+  lastPrice: number | null;
+  /** When each player last posted a quote here (pulling does not reset it). */
+  lastQuoteAt: Record<string, number>;
+  uptime: Record<string, { ms: number; since: number | null }>;
 }
 
 export interface ScheduledEvent {
@@ -109,31 +137,38 @@ export interface Round {
   insiderId: string | null;
   participants: string[];
   schedule: ScheduledEvent[];
-  quotes: Record<string, Quote>;
-  positions: Record<string, number>;
-  cash: Record<string, number>;
-  rebates: Record<string, number>;
+  markets: MarketId[];
+  books: Partial<Record<MarketId, Book>>;
+  /** The 3 original contract cards whose product the product market pays. */
+  productCards: number[];
+  clues: Record<string, Clue[]>;
+  /** Each participant's exact fair value per market, refreshed whenever their information changes. */
+  fv: Record<string, Partial<Record<MarketId, number>>>;
+  privateStart: number;
+  privatePerReveal: number;
+  cluesPerReveal: number;
   trades: Trade[];
   decisions: Decision[];
   infoEvents: InfoEvent[];
-  uptime: Record<string, { ms: number; since: number | null }>;
   startedAt: number | null;
   endsAt: number | null;
   pausedMs: number;
   activeMs: number | null;
-  settlement: number | null;
-  lastPrice: number | null;
+  /** Per market, once settled. */
+  settlement: Partial<Record<MarketId, number>> | null;
   quoteCooldownMs: number;
-  /** When each player last posted a quote (pulling does not reset it). */
-  lastQuoteAt: Record<string, number>;
 }
 
 export interface RoundResult {
   number: number;
   type: RoundType;
+  /** Sum market settlement. */
   settlement: number;
+  /** Total across markets. */
   pnl: Record<string, number>;
   volume: number;
+  markets: Partial<Record<MarketId, { settlement: number; pnl: Record<string, number>; volume: number }>>;
+  productCards: number[];
   contract: number[];
   rule: ValueRule;
   insiderId: string | null;
@@ -142,7 +177,8 @@ export interface RoundResult {
 // ---- wire ----
 
 export type Command =
-  | { kind: 'setConfig'; roundTypes?: RoundType[]; briefingMs?: number; marketMs?: number; resultsMs?: number; quoteCooldownMs?: number; revealEveryMs?: number; shockCount?: number }
+  | { kind: 'setConfig'; roundTypes?: RoundType[]; briefingMs?: number; marketMs?: number; resultsMs?: number; quoteCooldownMs?: number; revealEveryMs?: number; shockCount?: number;
+      productMarket?: boolean; privateStart?: number; privatePerReveal?: number; cluesPerReveal?: number }
   | { kind: 'start' }
   | { kind: 'pause' }
   | { kind: 'resume' }
@@ -150,9 +186,9 @@ export type Command =
   | { kind: 'skip' }
   | { kind: 'addBots'; count: number }
   | { kind: 'removePlayer'; playerId: string }
-  | { kind: 'setQuote'; bid: number; ask: number; size: number }
-  | { kind: 'pullQuote' }
-  | { kind: 'trade'; targetId: string; side: Side; qty: number; price: number };
+  | { kind: 'setQuote'; market?: MarketId; bid: number; ask: number; size: number }
+  | { kind: 'pullQuote'; market?: MarketId }
+  | { kind: 'trade'; market?: MarketId; targetId: string; side: Side; qty: number; price: number };
 
 export interface Receipt {
   requestId: string;
@@ -176,6 +212,7 @@ export interface QuoteView {
 
 export interface TradeView {
   id: string;
+  market: MarketId;
   at: number;
   buyerId: string;
   sellerId: string;
@@ -205,41 +242,54 @@ export interface Snapshot {
     stageTimes: number[];
     contractSize: number;
     publicCards: number[];
+    /** Product cards this viewer knows (all of them once settled). */
+    productKnown: number[];
+    productCount: number;
     rule: ValueRule;
     shocks: { at: number; id: ShockId }[];
     roles: Record<string, Role>;
-    quotes: QuoteView[];
-    trades: TradeView[];
-    chart: [number, number][];
-    publicFvSeries: [number, number][] | null;
-    publicFv: number | null;
-    volume: number;
-    lastPrice: number | null;
+    marketIds: MarketId[];
+    markets: Partial<Record<MarketId, MarketView>>;
     /** Revealed at results. */
     contract: number[] | null;
-    settlement: number | null;
     insiderId: string | null;
     privateHolders: Record<number, number> | null;
   } | null;
   me: {
     role: Role;
     privateCards: number[];
-    position: number;
-    cash: number;
-    rebates: number;
-    /** Only revealed once the round settles: players work out fair value themselves. */
-    fv: number | null;
-    nextQuoteAt: number | null;
-    quote: Quote | null;
-    uptimeMs: number;
+    clues: Clue[];
     isInsider: boolean;
+    books: Partial<Record<MarketId, MyBook>>;
   } | null;
   results: RoundResult[];
   reviews: PlayerRoundReview[];
   host: {
-    positions: { playerId: string; position: number; live: boolean }[];
-    quoting: number;
+    positions: { playerId: string; market: MarketId; position: number; live: boolean }[];
+    quoting: Partial<Record<MarketId, number>>;
   } | null;
+}
+
+export interface MarketView {
+  quotes: QuoteView[];
+  trades: TradeView[];
+  chart: [number, number][];
+  publicFvSeries: [number, number][] | null;
+  publicFv: number | null;
+  volume: number;
+  lastPrice: number | null;
+  settlement: number | null;
+}
+
+export interface MyBook {
+  position: number;
+  cash: number;
+  rebates: number;
+  /** Only revealed once the round settles: players work out fair value themselves. */
+  fv: number | null;
+  nextQuoteAt: number | null;
+  quote: Quote | null;
+  uptimeMs: number;
 }
 
 export type ClientMessage =

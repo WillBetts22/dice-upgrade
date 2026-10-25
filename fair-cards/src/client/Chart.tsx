@@ -1,30 +1,35 @@
+import type { MarketId } from '../shared/rules.js';
 import type { Snapshot } from '../shared/types.js';
 import { useNow } from './common.js';
 
 /** Trade prices against the public fair value (and the settlement once known). */
-export function PriceChart({ s, offset, height = 220 }: { s: Snapshot; offset: number; height?: number }) {
+export function PriceChart({ s, offset, m = 'sum', height = 220 }: { s: Snapshot; offset: number; m?: MarketId; height?: number }) {
   const now = useNow(1000) + offset;
-  const r = s.round;
-  if (!r || r.startedAt === null || r.endsAt === null) return null;
+  const round = s.round;
+  const mk = round?.markets[m];
+  if (!round || !mk || round.startedAt === null || round.endsAt === null) return null;
+  const r = { ...round, ...mk };
   const W = 640;
   const H = height;
   const pad = { l: 36, r: 10, t: 10, b: 20 };
-  const t0 = r.startedAt;
-  const t1 = r.endsAt;
+  const t0 = round.startedAt;
+  const t1 = round.endsAt;
   const tNow = r.settlement !== null ? t1 : Math.min(t1, now);
   const ys: number[] = r.chart.map((p) => p[1]);
   for (const p of r.publicFvSeries ?? []) ys.push(p[1]);
   if (r.settlement !== null) ys.push(r.settlement);
-  if (!ys.length) ys.push(70);
+  if (!ys.length) ys.push(m === 'product' ? 300 : 70);
+  const minSpan = m === 'product' ? 200 : 16;
   let lo = Math.min(...ys);
   let hi = Math.max(...ys);
-  if (hi - lo < 16) {
-    const m = (hi + lo) / 2;
-    lo = m - 8;
-    hi = m + 8;
+  if (hi - lo < minSpan) {
+    const mid = (hi + lo) / 2;
+    lo = mid - minSpan / 2;
+    hi = mid + minSpan / 2;
   }
-  lo = Math.floor(lo - 2);
-  hi = Math.ceil(hi + 2);
+  const pad2 = (hi - lo) * 0.06;
+  lo = Math.max(0, Math.floor(lo - pad2));
+  hi = Math.ceil(hi + pad2);
   const x = (t: number) => pad.l + ((Math.min(Math.max(t, t0), t1) - t0) / (t1 - t0)) * (W - pad.l - pad.r);
   const y = (v: number) => pad.t + (1 - (v - lo) / (hi - lo)) * (H - pad.t - pad.b);
   const ticks = 4;

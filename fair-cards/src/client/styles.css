@@ -195,3 +195,12 @@ details summary { cursor: pointer; font-weight: 600; }
   font-variant-numeric: tabular-nums;
   font-weight: 600;
 }
+
+.pcard .ptag { position: absolute; top: 2px; left: 3px; font-size: 0.6rem; font-weight: 800; color: var(--accent); }
+.pcard.prod { border-color: var(--accent); }
+.pcard.hidden.prod { border-color: var(--accent); color: var(--accent); }
+.seg.tabs button { flex: 1; min-height: 42px; font-weight: 700; }
+.clues { margin: 4px 0 0; padding-left: 18px; }
+.clues li { margin: 4px 0; font-size: 0.92rem; }
+.badge.mk-product { background: var(--accent); color: var(--bg); }
+.seg.tabs { display: flex; width: 100%; }
