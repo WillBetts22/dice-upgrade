@@ -1,8 +1,3 @@
-node_modules
-dist
-data
-.env
-*.log
 .DS_Store
 .gstack/
 .claude/worktrees/

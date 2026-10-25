@@ -1,0 +1,91 @@
+// Test-mode bots: noisy fair-value traders that quote around their estimate and take obvious edges.
+import { randomUUID } from 'node:crypto';
+import { POSITION_LIMIT } from '../shared/rules.js';
+import type { Command } from '../shared/types.js';
+import { isLive, maxWidthFor, playerFv, type RoomState } from './engine.js';
+import type { RoomManager } from './manager.js';
+
+interface BotMemory {
+  nextAt: number;
+  noise: number;
+  noiseStage: number;
+}
+
+export function botDecision(room: RoomState, pid: string, noise: number, rand: () => number): Command | null {
+  const r = room.round;
+  if (!r || room.phase !== 'market' || room.pausedAt !== null || !r.participants.includes(pid)) return null;
+  const role = r.roles[pid];
+  const fv = playerFv(r, pid) + noise;
+  const pos = r.positions[pid] ?? 0;
+  const mine = r.quotes[pid];
+  const canTrade = role === 'taker' || isLive(mine);
+
+  if (canTrade) {
+    let best: Command | null = null;
+    let bestEdge = role === 'taker' ? 1.5 : 2;
+    for (const [oid, q] of Object.entries(r.quotes)) {
+      if (oid === pid) continue;
+      if (role === 'taker' && r.roles[oid] !== 'maker') continue;
+      if (q.askSize > 0 && fv - q.ask > bestEdge && pos < POSITION_LIMIT && (r.positions[oid] ?? 0) > -POSITION_LIMIT) {
+        bestEdge = fv - q.ask;
+        best = { kind: 'trade', targetId: oid, side: 'buy', qty: 1, price: q.ask };
+      }
+      if (q.bidSize > 0 && q.bid - fv > bestEdge && pos > -POSITION_LIMIT && (r.positions[oid] ?? 0) < POSITION_LIMIT) {
+        bestEdge = q.bid - fv;
+        best = { kind: 'trade', targetId: oid, side: 'sell', qty: 1, price: q.bid };
+      }
+    }
+    if (best) return best;
+  }
+  if (role === 'taker') return null;
+
+  const width = Math.max(1, maxWidthFor(r, pid) - (rand() < 0.4 ? 1 : 0));
+  const mid = fv - 0.35 * pos;
+  let bid = Math.round(mid - width / 2);
+  let ask = bid + width;
+  let bestAsk = Infinity;
+  let bestBid = -Infinity;
+  for (const [oid, q] of Object.entries(r.quotes)) {
+    if (oid === pid) continue;
+    if (q.askSize > 0) bestAsk = Math.min(bestAsk, q.ask);
+    if (q.bidSize > 0) bestBid = Math.max(bestBid, q.bid);
+  }
+  const wanted = bid;
+  if (bid >= bestAsk) {
+    bid = bestAsk - 1;
+    ask = bid + width;
+  } else if (ask <= bestBid) {
+    ask = bestBid + 1;
+    bid = ask - width;
+  }
+  // Stale quotes elsewhere would drag this quote far from fair value; step away instead.
+  if (Math.abs(bid - wanted) > width) return mine ? { kind: 'pullQuote' } : null;
+  if (bid < 0) return null;
+  if (isLive(mine) && Math.abs((mine.bid + mine.ask) / 2 - (bid + ask) / 2) < 1.5 && rand() < 0.85) return null;
+  return { kind: 'setQuote', bid, ask, size: 1 + Math.floor(rand() * 3) };
+}
+
+export function startBots(manager: RoomManager): () => void {
+  const memory = new Map<string, BotMemory>();
+  const timer = setInterval(() => {
+    const now = manager.clock.now();
+    for (const room of manager.allRooms()) {
+      if (room.phase !== 'market' || room.pausedAt !== null || !room.round) continue;
+      const stage = room.round.infoEvents.length;
+      for (const p of Object.values(room.players)) {
+        if (!p.isBot) continue;
+        const key = `${room.id}:${p.id}`;
+        let m = memory.get(key);
+        if (!m || m.noiseStage !== stage) {
+          m = { nextAt: m?.nextAt ?? now + Math.random() * 2000, noise: (Math.random() * 2 - 1) * 4, noiseStage: stage };
+          memory.set(key, m);
+        }
+        if (now < m.nextAt) continue;
+        m.nextAt = now + 1500 + Math.random() * 3500;
+        const cmd = botDecision(room, p.id, m.noise, Math.random);
+        if (cmd) void manager.command(room.id, { kind: 'player', playerId: p.id }, randomUUID(), cmd).catch(() => {});
+      }
+    }
+  }, 400);
+  return () => clearInterval(timer);
+}
