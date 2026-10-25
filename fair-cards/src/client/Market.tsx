@@ -100,7 +100,7 @@ export function QuotePanel({ s, client, offset }: { s: Snapshot; client: GameCli
         )}
       </div>
       <p className="small muted">
-        Width {ask - bid} of max {width}. You can post a new quote once every {Math.round(s.config.quoteCooldownMs / 1000)} s, so think before you quote; pulling is always allowed. A quote that crosses someone else's price is rejected: trade with them instead.
+        Width {ask - bid} of max {width}.{s.config.quoteCooldownMs > 0 && ` You can post a new quote once every ${Math.round(s.config.quoteCooldownMs / 1000)} s; pulling is always allowed.`} A bid at or above someone's ask buys from them at their price (and an ask at or below a bid sells to it); the rest of your quote stays up.
       </p>
     </div>
   );

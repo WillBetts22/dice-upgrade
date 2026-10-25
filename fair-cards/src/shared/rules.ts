@@ -52,8 +52,8 @@ export const SHOCK_JITTER = 0.04;
 export const SHOCK_GAP = 0.04;
 
 export const MAX_WIDTH = 4;
-/** Minimum time between a player's quote posts, so quoting is a considered decision. */
-export const DEFAULT_QUOTE_COOLDOWN_MS = 15_000;
+/** Minimum time between a player's quote posts. Off unless the host turns it on. */
+export const DEFAULT_QUOTE_COOLDOWN_MS = 0;
 export const QUOTE_COOLDOWN_BOUNDS: [number, number] = [0, 60_000];
 export const MAKER_WIDTH = 2;
 export const MAX_QUOTE_SIZE = 5;

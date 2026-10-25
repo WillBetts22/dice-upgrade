@@ -20,7 +20,7 @@ A live market-making game for 2 to 30 people. Everyone trades one contract whose
 
 Private cards are spread so each card is seen by roughly the same number of people, with the cards that stay hidden longest dealt first. Alone you know a little; together the room knows nearly everything.
 
-**Quoting.** Every player posts a two-sided quote: a bid (you buy at) and an ask (you sell at), at most 4 apart, 1 to 5 lots each side. Anyone can buy from your ask or sell to your bid. You can only trade with others while your own two-sided quote is live, so everyone is a market maker. You can post a new quote at most once every 15 seconds (the host can set 0 to 60), so each quote is a considered estimate rather than a reflex; pulling a quote is always allowed. A quote that would cross someone else's price is rejected: trade with them instead.
+**Quoting.** Every player posts a two-sided quote: a bid (you buy at) and an ask (you sell at), at most 4 apart, 1 to 5 lots each side. Anyone can buy from your ask or sell to your bid. You can only trade with others while your own two-sided quote is live, so everyone is a market maker. A quote through someone else's price trades at once at their price, best price first, like a limit order on a real exchange: bid 74 into an ask of 69 and you buy at 69, up to their size, and the rest of your quote rests in the book. The host can optionally limit how often each player posts a new quote (off by default, up to 60 s); pulling a quote is always allowed.
 
 **Scoring.** Round P&L = cash + position x settlement. Positions are capped at 10 lots long or short and reset each round. Scores add up across rounds.
 

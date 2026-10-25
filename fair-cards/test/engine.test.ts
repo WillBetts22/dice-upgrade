@@ -114,8 +114,6 @@ describe('quotes and trades', () => {
     expect(err(() => h.as('p0', { kind: 'setQuote', bid: 70, ask: 75, size: 1 }))).toBe('too_wide');
     expect(err(() => h.as('p0', { kind: 'setQuote', bid: 72, ask: 72, size: 1 }))).toBe('bad_quote');
     h.as('p0', { kind: 'setQuote', bid: 68, ask: 72, size: 2 });
-    expect(err(() => h.as('p1', { kind: 'setQuote', bid: 72, ask: 74, size: 1 }))).toBe('crosses');
-    expect(err(() => h.as('p1', { kind: 'setQuote', bid: 64, ask: 68, size: 1 }))).toBe('crosses');
     expect(err(() => h.as('p1', { kind: 'trade', targetId: 'p0', side: 'buy', qty: 1, price: 72 }))).toBe('no_quote');
     h.as('p1', { kind: 'setQuote', bid: 67, ask: 71, size: 1 });
     expect(err(() => h.as('p1', { kind: 'trade', targetId: 'p0', side: 'buy', qty: 1, price: 71 }))).toBe('quote_changed');
@@ -225,6 +223,56 @@ describe('quote cooldown and hidden fair value', () => {
     expect(() => h.host({ kind: 'setConfig', quoteCooldownMs: 120_000 })).toThrow(/0 to 60 seconds/);
     h.host({ kind: 'setConfig', quoteCooldownMs: 5_000 });
     expect(h.room.config.quoteCooldownMs).toBe(5_000);
+  });
+});
+
+describe('crossing quotes trade automatically', () => {
+  it('buys from the cheapest asks first at their prices, then rests the rest', () => {
+    const h = new Harness(4);
+    h.open();
+    h.as('p0', { kind: 'setQuote', bid: 65, ask: 69, size: 2 });
+    h.as('p1', { kind: 'setQuote', bid: 66, ask: 70, size: 1 });
+    const res = h.as('p2', { kind: 'setQuote', bid: 74, ask: 78, size: 5 });
+    expect(h.r.trades.map((t) => [t.sellerId, t.price, t.qty])).toEqual([
+      ['p0', 69, 2],
+      ['p1', 70, 1],
+    ]);
+    expect(h.r.trades.every((t) => t.aggressorId === 'p2' && t.buyerId === 'p2')).toBe(true);
+    expect(h.r.positions.p2).toBe(3);
+    expect(h.r.cash.p2).toBe(-208);
+    expect(h.r.quotes.p2).toMatchObject({ bid: 74, ask: 78, bidSize: 2, askSize: 5 });
+    expect(h.r.quotes.p0.askSize).toBe(0);
+    expect(res.message).toMatch(/Bought 2 from P0 at 69\. Bought 1 from P1 at 70\. Quoting 74 \/ 78/);
+  });
+
+  it('sells into bids above its ask', () => {
+    const h = new Harness(3);
+    h.open();
+    h.as('p0', { kind: 'setQuote', bid: 72, ask: 75, size: 3 });
+    h.as('p1', { kind: 'setQuote', bid: 66, ask: 70, size: 1 });
+    expect(h.r.trades).toHaveLength(1);
+    expect(h.r.trades[0]).toMatchObject({ buyerId: 'p0', sellerId: 'p1', price: 72, qty: 1 });
+    expect(h.r.quotes.p1).toMatchObject({ bidSize: 1, askSize: 0 });
+    expect(h.r.quotes.p0.bidSize).toBe(2);
+  });
+
+  it('respects position limits and does not leave a crossed book', () => {
+    const h = new Harness(3);
+    h.open();
+    h.r.positions.p2 = 9;
+    h.as('p0', { kind: 'setQuote', bid: 65, ask: 69, size: 5 });
+    h.as('p2', { kind: 'setQuote', bid: 74, ask: 78, size: 5 });
+    expect(h.r.positions.p2).toBe(10);
+    expect(h.r.quotes.p2.bidSize).toBe(0);
+    expect(h.r.quotes.p2.askSize).toBe(5);
+  });
+
+  it('has no quote cooldown unless the host sets one', () => {
+    const h = new Harness(2);
+    h.open();
+    h.as('p0', { kind: 'setQuote', bid: 68, ask: 72, size: 1 });
+    h.as('p0', { kind: 'setQuote', bid: 69, ask: 73, size: 1 });
+    expect(h.r.quotes.p0.bid).toBe(69);
   });
 });
 

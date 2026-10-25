@@ -577,12 +577,6 @@ export function applyCommand(room: RoomState, actor: Actor, cmd: Command, ctx: C
       const w = maxWidthFor(r, pid);
       if (ask - bid > w) throw new EngineError('too_wide', `Your quote can be at most ${w} wide (bid ${bid}, so ask at most ${bid + w}).`);
       if (size < 1 || size > MAX_QUOTE_SIZE) throw new EngineError('bad_size', `Size must be 1 to ${MAX_QUOTE_SIZE}.`);
-      for (const [oid, oq] of Object.entries(r.quotes)) {
-        if (oid === pid) continue;
-        const who = room.players[oid]?.name ?? 'another player';
-        if (oq.askSize > 0 && bid >= oq.ask) throw new EngineError('crosses', `Your bid ${bid} would cross ${who}'s ask ${oq.ask}. Buy from them instead, or bid lower.`);
-        if (oq.bidSize > 0 && ask <= oq.bid) throw new EngineError('crosses', `Your ask ${ask} would cross ${who}'s bid ${oq.bid}. Sell to them instead, or ask higher.`);
-      }
       const allowedAt = nextQuoteAt(r, pid);
       if (allowedAt !== null && ctx.now < allowedAt) {
         const secs = Math.ceil((allowedAt - ctx.now) / 1000);
@@ -592,8 +586,12 @@ export function applyCommand(room: RoomState, actor: Actor, cmd: Command, ctx: C
       (r.lastQuoteAt ??= {})[pid] = ctx.now;
       r.quotes[pid] = { id: ctx.newId(), bid, ask, bidSize: size, askSize: size, size, postedAt: ctx.now, fvAtPost: fv };
       r.decisions.push({ at: ctx.now, playerId: pid, kind: 'quote', bid, ask, size, fv, publicFv: publicFv(r), position: r.positions[pid] ?? 0 });
+      // A quote through someone else's price trades at their price first, like a marketable limit order.
+      const fills = [...sweep(room, pid, 'buy', ctx), ...sweep(room, pid, 'sell', ctx)];
       touchUptime(room, pid, ctx.now);
-      return { message: `Quoting ${bid} / ${ask}, ${size} each side.` };
+      const q = r.quotes[pid];
+      const rest = q.bidSize > 0 || q.askSize > 0 ? `Quoting ${q.bidSize ? q.bid : '-'} / ${q.askSize ? q.ask : '-'}${q.bidSize === q.askSize ? `, ${q.bidSize} each side` : ` (${q.bidSize} bid, ${q.askSize} offered)`}.` : 'Your quote filled completely.';
+      return { message: fills.length ? `${fills.join(' ')} ${rest}` : rest };
     }
     case 'pullQuote': {
       const { r, pid } = needParticipant(room, actor);
@@ -609,13 +607,38 @@ export function applyCommand(room: RoomState, actor: Actor, cmd: Command, ctx: C
   throw new EngineError('bad_command', 'Unknown command.');
 }
 
-function trade(room: RoomState, actor: Actor, cmd: { targetId: string; side: Side; qty: number; price: number }, ctx: Ctx): CommandResult {
+/** Trades the player's newly posted quote against every opposite quote it crosses, best price first. */
+function sweep(room: RoomState, pid: string, side: Side, ctx: Ctx): string[] {
+  const r = room.round!;
+  const buy = side === 'buy';
+  const mine = r.quotes[pid];
+  const out: string[] = [];
+  const crossing = Object.entries(r.quotes)
+    .filter(([oid, q]) => oid !== pid && (buy ? q.askSize > 0 && q.ask <= mine.bid : q.bidSize > 0 && q.bid >= mine.ask))
+    .sort(([, a], [, b]) => (buy ? a.ask - b.ask : b.bid - a.bid) || a.postedAt - b.postedAt);
+  for (const [oid, q] of crossing) {
+    const qty = Math.min(available(r, pid, buy ? 'bid' : 'ask'), available(r, oid, buy ? 'ask' : 'bid'));
+    if (qty <= 0) continue;
+    out.push(trade(room, { kind: 'player', playerId: pid }, { targetId: oid, side, qty, price: buy ? q.ask : q.bid }, ctx, true).message!);
+    if (buy) mine.bidSize -= qty;
+    else mine.askSize -= qty;
+  }
+  // Whatever still crosses could not trade (position limits), so it does not rest.
+  const stillCrosses = Object.entries(r.quotes).some(([oid, q]) => oid !== pid && (buy ? available(r, oid, 'ask') > 0 && q.ask <= mine.bid : available(r, oid, 'bid') > 0 && q.bid >= mine.ask));
+  if (stillCrosses) {
+    if (buy) mine.bidSize = 0;
+    else mine.askSize = 0;
+  }
+  return out;
+}
+
+function trade(room: RoomState, actor: Actor, cmd: { targetId: string; side: Side; qty: number; price: number }, ctx: Ctx, sweeping = false): CommandResult {
   const { r, pid } = needParticipant(room, actor);
   const role = r.roles[pid];
   if (cmd.targetId === pid) throw new EngineError('self', 'That is your own quote.');
   if (cmd.side !== 'buy' && cmd.side !== 'sell') throw new EngineError('bad_side', 'Buy or sell?');
   if (!isInt(cmd.qty) || cmd.qty < 1 || cmd.qty > MAX_QUOTE_SIZE) throw new EngineError('bad_qty', `Trade 1 to ${MAX_QUOTE_SIZE} lots.`);
-  if (role !== 'taker' && !isLive(r.quotes[pid])) throw new EngineError('no_quote', 'Post a two-sided quote first: you can only trade with others while your own quote is live.');
+  if (role !== 'taker' && !sweeping && !isLive(r.quotes[pid])) throw new EngineError('no_quote', 'Post a two-sided quote first: you can only trade with others while your own quote is live.');
   if (role === 'taker' && r.roles[cmd.targetId] !== 'maker') throw new EngineError('takers', 'Takers can only trade against makers.');
   const q = r.quotes[cmd.targetId];
   const who = room.players[cmd.targetId]?.name ?? 'That player';
