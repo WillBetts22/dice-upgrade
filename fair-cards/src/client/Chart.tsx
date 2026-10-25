@@ -50,8 +50,8 @@ export function PriceChart({ s, offset, height = 220 }: { s: Snapshot; offset: n
             </g>
           );
         })}
-        {[0.25, 0.5, 0.75].map((f) => (
-          <line key={f} x1={x(t0 + f * (t1 - t0))} x2={x(t0 + f * (t1 - t0))} y1={pad.t} y2={H - pad.b} stroke="var(--border)" strokeDasharray="3 4" />
+        {(r.stageTimes ?? []).slice(1).map((t) => (
+          <line key={t} x1={x(t)} x2={x(t)} y1={pad.t} y2={H - pad.b} stroke="var(--border)" strokeDasharray="3 4" />
         ))}
         {r.shocks.map((k) => (
           <line key={k.at} x1={x(k.at)} x2={x(k.at)} y1={pad.t} y2={H - pad.b} stroke="var(--warn)" strokeWidth={2} />

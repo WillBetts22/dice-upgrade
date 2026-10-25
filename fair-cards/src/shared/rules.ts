@@ -37,11 +37,19 @@ export const CONTRACT_SIZE = 10;
 export const PUBLIC_SCHEDULE = [0, 2, 4, 7];
 /** New private cards per player at each stage. */
 export const PRIVATE_SCHEDULE = [1, 1, 1, 0];
-/** When each stage starts, as a fraction of the market. */
-export const STAGE_FRACTIONS = [0, 0.25, 0.5, 0.75];
+export const STAGE_COUNT = PUBLIC_SCHEDULE.length;
+/** Time between information stages; stage k starts k intervals into the market. */
+export const DEFAULT_REVEAL_EVERY_MS = 120_000;
+export const REVEAL_EVERY_BOUNDS: [number, number] = [15_000, 450_000];
+/** The last reveal must leave at least this long to trade on it. */
+export const MIN_FINAL_STAGE_MS = 15_000;
 export const INSIDER_START_CARDS = 5;
-export const SHOCK_FRACTIONS = [0.37, 0.63];
-export const SHOCK_JITTER = 0.05;
+/** News shocks in each news round, spread evenly through the market. */
+export const DEFAULT_SHOCK_COUNT = 2;
+export const SHOCK_COUNT_BOUNDS: [number, number] = [1, 6];
+export const SHOCK_JITTER = 0.04;
+/** Shocks keep at least this fraction of the market away from a reveal. */
+export const SHOCK_GAP = 0.04;
 
 export const MAX_WIDTH = 4;
 /** Minimum time between a player's quote posts, so quoting is a considered decision. */
@@ -77,6 +85,16 @@ export function makerCount(players: number): number {
   return Math.min(players - 1, Math.max(1, Math.round(players / 3)));
 }
 
+/** Market length that fits every reveal with time left to trade on the last one. */
+export function minMarketMs(revealEveryMs: number): number {
+  return (STAGE_COUNT - 1) * revealEveryMs + MIN_FINAL_STAGE_MS;
+}
+
+/** Longest reveal interval a market of this length allows. */
+export function maxRevealEveryMs(marketMs: number): number {
+  return Math.floor((marketMs - MIN_FINAL_STAGE_MS) / (STAGE_COUNT - 1) / 1000) * 1000;
+}
+
 export function projectedMinutes(rounds: number, d: Durations = DEFAULT_DURATIONS): number {
   return Math.round(5 + (rounds * (d.briefingMs + d.marketMs + d.resultsMs)) / 60_000);
 }
@@ -84,7 +102,7 @@ export function projectedMinutes(rounds: number, d: Durations = DEFAULT_DURATION
 export const HOST_SCRIPT = `Fair Cards in five minutes.
 
 1. Each round the server deals 10 hidden cards. The contract pays the sum of those cards: ace is 1, jack 11, queen 12, king 13. The average is 70.
-2. You each get a private card or two, and every two minutes more cards are revealed to everyone. Together the room knows almost everything; alone you know a little.
+2. You each get a private card or two, and at regular intervals more cards are revealed to everyone. Together the room knows almost everything; alone you know a little.
 3. You trade by quoting: a bid (the price you will buy at) and an ask (the price you will sell at), at most 4 apart. Others can buy from your ask or sell to your bid. You can only trade with others while your own quote is live.
 4. Score = cash + position x settlement. You can go long or short up to 10 lots. Positions reset each round.
 5. Watch the chart: trades should find the true value before the public cards do. That is price discovery.

@@ -1,9 +1,27 @@
 import QRCode from 'qrcode';
 import { useEffect, useState } from 'react';
-import { HOST_SCRIPT, MAX_PLAYERS, MAX_ROUNDS, MIN_PLAYERS, MIN_ROUNDS, projectedMinutes, ROUND_TYPE_IDS, ROUND_TYPES, type RoundType } from '../shared/rules.js';
+import {
+  DEFAULT_REVEAL_EVERY_MS,
+  DEFAULT_SHOCK_COUNT,
+  DURATION_BOUNDS,
+  HOST_SCRIPT,
+  MAX_PLAYERS,
+  MAX_ROUNDS,
+  maxRevealEveryMs,
+  MIN_PLAYERS,
+  MIN_ROUNDS,
+  projectedMinutes,
+  QUOTE_COOLDOWN_BOUNDS,
+  REVEAL_EVERY_BOUNDS,
+  ROUND_TYPE_IDS,
+  ROUND_TYPES,
+  type RoundType,
+  SHOCK_COUNT_BOUNDS,
+  STAGE_COUNT,
+} from '../shared/rules.js';
 import type { Snapshot } from '../shared/types.js';
 import { PriceChart } from './Chart.js';
-import { ConnBanner, ContractCards, Countdown, f1, PHASE_LABEL, playerName, ROLE_LABEL, RuleLine, roundTitle, ShockBanner, Standings, Toasts, useClient } from './common.js';
+import { ConnBanner, ContractCards, Countdown, f1, fmtClock, PHASE_LABEL, playerName, ROLE_LABEL, RuleLine, roundTitle, ShockBanner, Standings, Toasts, useClient } from './common.js';
 import { joinRoom } from './Landing.js';
 import { Tape } from './Market.js';
 import { type ClientState, creds, type GameClient } from './net.js';
@@ -164,6 +182,75 @@ function Controls({ s, client, state }: { s: Snapshot; client: GameClient; state
   );
 }
 
+/** A value with minus and plus buttons. */
+function Stepper({ label, value, show, step, min, max, onSet, hint }: { label: string; value: number; show: (v: number) => string; step: number; min: number; max: number; onSet: (v: number) => void; hint?: string }) {
+  const snap = (v: number) => Math.min(max, Math.max(min, v));
+  return (
+    <div className="stepper">
+      <div style={{ flex: 1 }}>
+        <div>{label}</div>
+        {hint && <div className="small muted">{hint}</div>}
+      </div>
+      <button className="btn small ghost" aria-label={`Less: ${label}`} disabled={value <= min} onClick={() => onSet(snap(value - step))}>
+        -
+      </button>
+      <span className="stepper-v">{show(value)}</span>
+      <button className="btn small ghost" aria-label={`More: ${label}`} disabled={value >= max} onClick={() => onSet(snap(value + step))}>
+        +
+      </button>
+    </div>
+  );
+}
+
+const clock = (ms: number) => (ms < 60_000 ? `${ms / 1000} s` : fmtClock(ms));
+
+function TimingSetup({ s, client }: { s: Snapshot; client: GameClient }) {
+  const c = s.config;
+  const set = (cmd: Omit<Extract<Parameters<GameClient['command']>[0], { kind: 'setConfig' }>, 'kind'>) => client.command({ kind: 'setConfig', ...cmd }, { toast: false });
+  const reveal = Math.min(c.revealEveryMs ?? DEFAULT_REVEAL_EVERY_MS, maxRevealEveryMs(c.marketMs));
+  const shocks = c.shockCount ?? DEFAULT_SHOCK_COUNT;
+  const hasNews = c.roundTypes.includes('shocks');
+  const revealTimes = Array.from({ length: STAGE_COUNT - 1 }, (_, k) => fmtClock((k + 1) * reveal)).join(', ');
+  return (
+    <div className="card stack">
+      <h3>Timing</h3>
+      <Stepper label="Briefing before each round" value={c.briefingMs} show={clock} step={5_000} min={DURATION_BOUNDS.briefingMs[0]} max={DURATION_BOUNDS.briefingMs[1]} onSet={(v) => set({ briefingMs: v })} />
+      <Stepper label="Market length" value={c.marketMs} show={clock} step={30_000} min={DURATION_BOUNDS.marketMs[0]} max={DURATION_BOUNDS.marketMs[1]} onSet={(v) => set({ marketMs: v })} />
+      <Stepper label="Results and review after each round" value={c.resultsMs} show={clock} step={15_000} min={DURATION_BOUNDS.resultsMs[0]} max={DURATION_BOUNDS.resultsMs[1]} onSet={(v) => set({ resultsMs: v })} />
+      <Stepper
+        label="New information every"
+        hint={`Reveals at ${revealTimes}; the market closes at ${fmtClock(c.marketMs)}. A longer gap stretches the market if needed.`}
+        value={reveal}
+        show={clock}
+        step={15_000}
+        min={REVEAL_EVERY_BOUNDS[0]}
+        max={REVEAL_EVERY_BOUNDS[1]}
+        onSet={(v) => set({ revealEveryMs: v })}
+      />
+      <Stepper
+        label="News shocks per news round"
+        hint={hasNews ? `About one every ${clock(Math.round(c.marketMs / (shocks + 1) / 1000) * 1000)}, at random times.` : 'Only used in news shock rounds; add one above.'}
+        value={shocks}
+        show={(v) => String(v)}
+        step={1}
+        min={SHOCK_COUNT_BOUNDS[0]}
+        max={SHOCK_COUNT_BOUNDS[1]}
+        onSet={(v) => set({ shockCount: v })}
+      />
+      <Stepper
+        label="Time between a player's quote updates"
+        hint="Pulling a quote is always allowed."
+        value={c.quoteCooldownMs}
+        show={(v) => (v === 0 ? 'off' : clock(v))}
+        step={5_000}
+        min={QUOTE_COOLDOWN_BOUNDS[0]}
+        max={QUOTE_COOLDOWN_BOUNDS[1]}
+        onSet={(v) => set({ quoteCooldownMs: v })}
+      />
+    </div>
+  );
+}
+
 function LobbySetup({ s, client }: { s: Snapshot; client: GameClient }) {
   const [hostName, setHostName] = useState('');
   const hostPlayer = s.players.find((p) => p.isHost);
@@ -200,40 +287,9 @@ function LobbySetup({ s, client }: { s: Snapshot; client: GameClient }) {
         <button className="btn small" disabled={c.roundTypes.length >= MAX_ROUNDS} onClick={() => setTypes([...c.roundTypes, 'discovery'])}>
           Add a round
         </button>
-        <div className="row">
-          <label htmlFor="cool" style={{ margin: 0, flex: 1 }}>
-            Seconds between a player's quote updates
-          </label>
-          <input
-            id="cool"
-            type="number"
-            min={0}
-            max={60}
-            defaultValue={c.quoteCooldownMs / 1000}
-            style={{ width: 90 }}
-            onBlur={(e) => client.command({ kind: 'setConfig', quoteCooldownMs: Math.round(Number(e.target.value) * 1000) })}
-          />
-        </div>
         <p className="small muted">Players never see fair values during the market; they work them out. The review after each round shows the exact numbers.</p>
-        <details>
-          <summary>Phase durations</summary>
-          <div className="row" style={{ marginTop: 8 }}>
-            {(
-              [
-                ['briefingMs', 'Briefing'],
-                ['marketMs', 'Market'],
-                ['resultsMs', 'Results'],
-              ] as const
-            ).map(([k, label]) => (
-              <div key={k} style={{ flex: '1 1 110px' }}>
-                <label>{label} (seconds)</label>
-                <input type="number" defaultValue={c[k] / 1000} min={5} onBlur={(e) => client.command({ kind: 'setConfig', [k]: Math.round(Number(e.target.value) * 1000) })} />
-              </div>
-            ))}
-          </div>
-          <p className="small muted">Public reveals happen at a quarter, half and three quarters of the market.</p>
-        </details>
       </div>
+      <TimingSetup s={s} client={client} />
       <div className="card stack">
         <h3>Play as well?</h3>
         {hostPlayer ? (

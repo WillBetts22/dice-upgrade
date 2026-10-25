@@ -11,6 +11,10 @@ export interface RoomConfig extends Durations {
   devMode: boolean;
   /** Minimum ms between a player's quote posts. */
   quoteCooldownMs: number;
+  /** Ms between information stages. */
+  revealEveryMs: number;
+  /** News shocks in each news round. */
+  shockCount: number;
 }
 
 export interface Quote {
@@ -138,7 +142,7 @@ export interface RoundResult {
 // ---- wire ----
 
 export type Command =
-  | { kind: 'setConfig'; roundTypes?: RoundType[]; briefingMs?: number; marketMs?: number; resultsMs?: number; quoteCooldownMs?: number }
+  | { kind: 'setConfig'; roundTypes?: RoundType[]; briefingMs?: number; marketMs?: number; resultsMs?: number; quoteCooldownMs?: number; revealEveryMs?: number; shockCount?: number }
   | { kind: 'start' }
   | { kind: 'pause' }
   | { kind: 'resume' }
@@ -197,6 +201,8 @@ export interface Snapshot {
     startedAt: number | null;
     endsAt: number | null;
     nextInfoAt: number | null;
+    /** When each information stage happens (shock times stay secret). */
+    stageTimes: number[];
     contractSize: number;
     publicCards: number[];
     rule: ValueRule;

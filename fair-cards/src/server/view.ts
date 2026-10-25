@@ -31,6 +31,7 @@ export function buildSnapshot(room: RoomState, actor: Actor, now: number, connec
       startedAt: r.startedAt,
       endsAt: r.endsAt,
       nextInfoAt: nextStage?.at ?? null,
+      stageTimes: r.schedule.filter((e) => e.kind === 'stage' && e.at !== null).map((e) => e.at!),
       contractSize: r.contract.length,
       publicCards: pub,
       rule: r.rule,

@@ -227,3 +227,45 @@ describe('quote cooldown and hidden fair value', () => {
     expect(h.room.config.quoteCooldownMs).toBe(5_000);
   });
 });
+
+describe('host timing settings', () => {
+  it('reveals new information at the chosen interval', () => {
+    const h = new Harness(3);
+    h.host({ kind: 'setConfig', revealEveryMs: 60_000 });
+    h.open();
+    const t0 = h.r.startedAt!;
+    const stages = h.r.schedule.filter((e) => e.kind === 'stage').map((e) => e.at! - t0);
+    expect(stages).toEqual([0, 60_000, 120_000, 180_000]);
+    h.advance(59_000);
+    expect(h.r.revealed).toBe(PUBLIC_SCHEDULE[0]);
+    h.advance(1_000);
+    expect(h.r.revealed).toBe(PUBLIC_SCHEDULE[1]);
+    h.advance(120_000);
+    expect(h.r.revealed).toBe(PUBLIC_SCHEDULE[3]);
+    expect(h.r.endsAt! - t0).toBe(M);
+  });
+
+  it('keeps the reveal interval and market length consistent', () => {
+    const h = new Harness(2);
+    h.host({ kind: 'setConfig', revealEveryMs: 300_000 });
+    expect(h.room.config.marketMs).toBe(3 * 300_000 + 15_000);
+    h.host({ kind: 'setConfig', marketMs: 120_000 });
+    expect(h.room.config.revealEveryMs).toBe(35_000);
+    expect(() => h.host({ kind: 'setConfig', revealEveryMs: 5_000 })).toThrow(/15 to 450 seconds/);
+  });
+
+  it('schedules the chosen number of news shocks, apart from reveals', () => {
+    for (const n of [1, 4, 6]) {
+      const h = new Harness(3, { types: ['shocks'] });
+      h.host({ kind: 'setConfig', shockCount: n });
+      h.open();
+      const shocks = h.r.schedule.filter((e) => e.kind === 'shock');
+      expect(shocks).toHaveLength(n);
+      expect(new Set(shocks.map((e) => e.shock)).size).toBe(n);
+      for (const e of shocks) for (const f of [0.25, 0.5, 0.75]) expect(Math.abs(e.frac - f)).toBeGreaterThan(0.039);
+      h.advance(M);
+      expect(h.r.shocks).toHaveLength(n);
+    }
+    expect(() => new Harness(2).host({ kind: 'setConfig', shockCount: 7 })).toThrow(/1 to 6/);
+  });
+});

@@ -6,15 +6,17 @@ A live market-making game for 2 to 30 people. Everyone trades one contract whose
 
 **The contract.** Each round the server secretly deals 10 cards from a standard deck. The contract settles at the sum of their values: ace 1, number cards face value, J 11, Q 12, K 13. Before anything is revealed the fair value is exactly 70.
 
-**Information.** Over an 8 minute market (host adjustable):
+**Information.** By default the market lasts 8 minutes and new information lands every 2 minutes:
 
-| When | Each player privately gets | Revealed to everyone |
+| When (default) | Each player privately gets | Revealed to everyone |
 |---|---|---|
 | Open | 1 card | none |
-| 1/4 through | +1 card | 2 cards |
-| 1/2 through | +1 card | 4 cards total |
-| 3/4 through | none | 7 cards total |
-| Close | | all 10, settlement |
+| 2:00 | +1 card | 2 cards |
+| 4:00 | +1 card | 4 cards total |
+| 6:00 | none | 7 cards total |
+| Close (8:00) | | all 10, settlement |
+
+**Host timing controls** (plus and minus buttons in the lobby): briefing length, market length, results length, time between reveals (15 s to 7:30; a longer gap stretches the market so the last reveal still leaves 15 s to trade), news shocks per news round (1 to 6, spread evenly with some randomness and kept clear of reveals), and time between a player's quote updates (0 to 60 s).
 
 Private cards are spread so each card is seen by roughly the same number of people, with the cards that stay hidden longest dealt first. Alone you know a little; together the room knows nearly everything.
 
@@ -28,7 +30,7 @@ Private cards are spread so each card is seen by roughly the same number of peop
 |---|---|---|
 | Price discovery | Plain rules above | Prices pool information no single person has |
 | Makers vs takers | A third of the room are market makers: no private cards, quotes at most 2 wide, a 1 coin rebate per lot filled. Everyone else is a taker with cards who can only trade against makers. | Adverse selection |
-| News shocks | Two surprise news events at random times change how the contract settles (face cards double, aces high, red cards void, +15, -20, or two extra hidden cards) | Public news moves prices at once |
+| News shocks | Surprise news events (2 by default, host sets 1 to 6) at random times change how the contract settles (face cards double, aces high, red cards void, +15, -20, or two extra hidden cards) | Public news moves prices at once |
 | Insider | One random player secretly starts with 5 private cards | Spotting informed flow |
 
 **No fair value is shown.** Players work out the fair value themselves from the cards they can see (a full deck totals 364, so each unseen card is worth on average what is left of the deck divided by the cards left). The projector shows trades only. The exact fair values appear in the review once the round settles. A host who is not also playing sees the public fair value on the host screen.

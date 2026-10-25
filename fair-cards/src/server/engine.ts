@@ -24,9 +24,15 @@ import {
   PUBLIC_SCHEDULE,
   QUOTE_COOLDOWN_BOUNDS,
   ROUND_TYPE_IDS,
-  SHOCK_FRACTIONS,
+  DEFAULT_REVEAL_EVERY_MS,
+  DEFAULT_SHOCK_COUNT,
+  maxRevealEveryMs,
+  minMarketMs,
+  REVEAL_EVERY_BOUNDS,
+  SHOCK_COUNT_BOUNDS,
+  SHOCK_GAP,
   SHOCK_JITTER,
-  STAGE_FRACTIONS,
+  STAGE_COUNT,
 } from '../shared/rules.js';
 import type { Command, InfoEvent, Phase, Quote, Role, Round, RoomConfig, RoundResult, ScheduledEvent, Side, Trade } from '../shared/types.js';
 import { seededRng, shuffle } from './rng.js';
@@ -85,7 +91,11 @@ export function newRoomState(args: { id: string; code: string; hostHash: string;
     hostHash: args.hostHash,
     revision: 1,
     createdAt: args.now,
-    config: { roundTypes: DEFAULT_ROUND_TYPES.slice(), ...DEFAULT_DURATIONS, devMode: args.devMode, quoteCooldownMs: DEFAULT_QUOTE_COOLDOWN_MS },
+    config: { roundTypes: DEFAULT_ROUND_TYPES.slice(), ...DEFAULT_DURATIONS, devMode: args.devMode,
+      quoteCooldownMs: DEFAULT_QUOTE_COOLDOWN_MS,
+      revealEveryMs: DEFAULT_REVEAL_EVERY_MS,
+      shockCount: DEFAULT_SHOCK_COUNT,
+    },
     phase: 'lobby',
     phaseDeadline: null,
     pausedAt: null,
@@ -167,10 +177,19 @@ function createRound(room: RoomState, ctx: Ctx): Round {
   } else for (const pid of participants) roles[pid] = 'trader';
   const insiderId = type === 'insider' ? participants[Math.floor(rand() * participants.length)] : null;
 
-  const schedule: ScheduledEvent[] = STAGE_FRACTIONS.map((frac, stage) => ({ frac, at: null, kind: 'stage', stage, done: false }));
+  const { marketMs } = room.config;
+  const revealEvery = Math.min(room.config.revealEveryMs ?? DEFAULT_REVEAL_EVERY_MS, maxRevealEveryMs(marketMs));
+  const stageFracs = Array.from({ length: STAGE_COUNT }, (_, k) => (k * revealEvery) / marketMs);
+  const schedule: ScheduledEvent[] = stageFracs.map((frac, stage) => ({ frac, at: null, kind: 'stage', stage, done: false }));
   if (type === 'shocks') {
-    const picks = shuffle(SHOCK_IDS, rand).slice(0, SHOCK_FRACTIONS.length);
-    SHOCK_FRACTIONS.forEach((f, i) => schedule.push({ frac: f + (rand() * 2 - 1) * SHOCK_JITTER, at: null, kind: 'shock', shock: picks[i], done: false }));
+    const n = Math.min(room.config.shockCount ?? DEFAULT_SHOCK_COUNT, SHOCK_IDS.length);
+    const picks = shuffle(SHOCK_IDS, rand).slice(0, n);
+    picks.forEach((shock, i) => {
+      let f = (i + 1) / (n + 1) + (rand() * 2 - 1) * SHOCK_JITTER;
+      // Keep news apart from reveals so each moves the market on its own.
+      for (const sf of stageFracs.slice(1)) if (Math.abs(f - sf) < SHOCK_GAP) f = f >= sf ? sf + SHOCK_GAP : sf - SHOCK_GAP;
+      schedule.push({ frac: Math.min(0.97, Math.max(0.03, f)), at: null, kind: 'shock', shock, done: false });
+    });
   }
   schedule.sort((a, b) => a.frac - b.frac);
 
@@ -435,6 +454,22 @@ export function applyCommand(room: RoomState, actor: Actor, cmd: Command, ctx: C
         const [lo, hi] = DURATION_BOUNDS[k];
         if (!isInt(v) || v < lo || v > hi) throw new EngineError('bad_config', `That duration must be between ${lo / 1000} and ${hi / 1000} seconds.`);
         c[k] = v;
+      }
+      // The reveal interval and market length must fit together; the field changed last wins.
+      if (cmd.marketMs !== undefined && (c.revealEveryMs ?? DEFAULT_REVEAL_EVERY_MS) > maxRevealEveryMs(c.marketMs))
+        c.revealEveryMs = Math.max(REVEAL_EVERY_BOUNDS[0], maxRevealEveryMs(c.marketMs));
+      if (cmd.revealEveryMs !== undefined) {
+        const v = cmd.revealEveryMs;
+        const [lo, hi] = REVEAL_EVERY_BOUNDS;
+        if (!isInt(v) || v < lo || v > hi) throw new EngineError('bad_config', `Time between reveals must be ${lo / 1000} to ${hi / 1000} seconds.`);
+        c.revealEveryMs = v;
+        c.marketMs = Math.max(c.marketMs, minMarketMs(v));
+      }
+      if (cmd.shockCount !== undefined) {
+        const v = cmd.shockCount;
+        const [lo, hi] = SHOCK_COUNT_BOUNDS;
+        if (!isInt(v) || v < lo || v > hi) throw new EngineError('bad_config', `News shocks per round must be ${lo} to ${hi}.`);
+        c.shockCount = v;
       }
       if (cmd.quoteCooldownMs !== undefined) {
         const v = cmd.quoteCooldownMs;

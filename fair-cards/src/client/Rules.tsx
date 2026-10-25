@@ -6,7 +6,7 @@ export function RulesSummary() {
       <h2>How to play</h2>
       <ol className="small">
         <li>Each round the server secretly deals 10 cards. The contract settles at their sum: ace 1, number cards face value, J 11, Q 12, K 13. The average is 70.</li>
-        <li>You get a private card at the start and two more over the round. Public cards are revealed a quarter, half and three quarters of the way through (2, then 4, then 7 cards). The rest show at settlement.</li>
+        <li>You get a private card at the start and two more over the round. Public cards are revealed at regular intervals the host sets (2, then 4, then 7 cards). The rest show at settlement.</li>
         <li>
           Quote a bid and an ask at most {MAX_WIDTH} apart. Others can buy from your ask or sell to your bid. You can only trade with others while your own two-sided quote is live, and you can post a new quote only every {Math.round(DEFAULT_QUOTE_COOLDOWN_MS / 1000)} seconds (the host can change this), so each quote should be a considered estimate.
         </li>
