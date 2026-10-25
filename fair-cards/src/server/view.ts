@@ -1,5 +1,5 @@
 import type { Snapshot } from '../shared/types.js';
-import { type Actor, available, isLive, playerFv, publicFv, type RoomState } from './engine.js';
+import { type Actor, available, isLive, nextQuoteAt, playerFv, publicFv, type RoomState } from './engine.js';
 
 const TRADE_TAIL = 40;
 
@@ -9,14 +9,16 @@ export function buildSnapshot(room: RoomState, actor: Actor, now: number, connec
   const playerId = actor.kind === 'player' ? actor.playerId : null;
   const done = room.phase === 'results' || room.phase === 'finished';
   const roundDone = !!r && r.settlement !== null;
-  const helpers = room.config.helpers;
+  const hostPlays = Object.values(room.players).some((p) => p.isHost && !p.spectator);
+  // Fair values are never shown during the market: players work them out. A host who is not playing sees the public one.
+  const showPublic = roundDone || (actor.kind === 'host' && !hostPlays);
 
   let round: Snapshot['round'] = null;
   if (r) {
     const pub = r.publicOrder.slice(0, r.revealed);
     // Public fair value after each information event, as a step series for the chart.
     const series: [number, number][] | null =
-      helpers || roundDone ? r.infoEvents.map((e) => [e.at, Math.round(e.publicFvAfter * 100) / 100] as [number, number]) : null;
+      showPublic ? r.infoEvents.map((e) => [e.at, Math.round(e.publicFvAfter * 100) / 100] as [number, number]) : null;
     let privateHolders: Record<number, number> | null = null;
     if (roundDone) {
       privateHolders = {};
@@ -49,7 +51,7 @@ export function buildSnapshot(room: RoomState, actor: Actor, now: number, connec
       trades: r.trades.slice(-TRADE_TAIL).map((t) => ({ id: t.id, at: t.at, buyerId: t.buyerId, sellerId: t.sellerId, aggressorId: t.aggressorId, price: t.price, qty: t.qty })),
       chart: r.trades.map((t) => [t.at, t.price] as [number, number]),
       publicFvSeries: series,
-      publicFv: helpers || roundDone ? publicFv(r) : null,
+      publicFv: showPublic ? publicFv(r) : null,
       volume: r.trades.reduce((a, t) => a + t.qty, 0),
       lastPrice: r.lastPrice,
       contract: roundDone ? r.contract : null,
@@ -67,7 +69,8 @@ export function buildSnapshot(room: RoomState, actor: Actor, now: number, connec
       position: r.positions[playerId] ?? 0,
       cash: r.cash[playerId] ?? 0,
       rebates: r.rebates[playerId] ?? 0,
-      fv: helpers || roundDone ? playerFv(r, playerId) : null,
+      fv: roundDone ? playerFv(r, playerId) : null,
+      nextQuoteAt: nextQuoteAt(r, playerId),
       quote: r.quotes[playerId] ?? null,
       uptimeMs: (() => {
         const u = r.uptime[playerId];
@@ -103,7 +106,7 @@ export function buildSnapshot(room: RoomState, actor: Actor, now: number, connec
         ? {
             // Live positions are hidden from a host who is also playing, until the round settles.
             positions:
-              Object.values(room.players).some((p) => p.isHost && !p.spectator) && !roundDone
+              hostPlays && !roundDone
                 ? []
                 : r.participants.map((pid) => ({ playerId: pid, position: r.positions[pid] ?? 0, live: isLive(r.quotes[pid]) })),
             quoting: r.participants.filter((pid) => isLive(r.quotes[pid])).length,

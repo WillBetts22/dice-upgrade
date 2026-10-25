@@ -5,10 +5,10 @@ export class Harness {
   now = 1_000_000;
   room: RoomState;
   private n = 0;
-  constructor(players: number, opts: { types?: RoomState['config']['roundTypes']; seed?: number; helpers?: boolean } = {}) {
+  constructor(players: number, opts: { types?: RoomState['config']['roundTypes']; seed?: number; cooldownMs?: number } = {}) {
     this.room = newRoomState({ id: 'room', code: 'TEST1', hostHash: 'h', devMode: true, now: this.now });
     if (opts.types) this.room.config.roundTypes = opts.types;
-    if (opts.helpers === false) this.room.config.helpers = false;
+    if (opts.cooldownMs !== undefined) this.room.config.quoteCooldownMs = opts.cooldownMs;
     this.seedValue = opts.seed ?? 12345;
     for (let i = 0; i < players; i++) addPlayer(this.room, { id: `p${i}`, name: `P${i}`, sessionHash: `s${i}`, isBot: false, isHost: false, now: this.now + i });
   }

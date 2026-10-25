@@ -2,7 +2,7 @@
 import { randomUUID } from 'node:crypto';
 import { POSITION_LIMIT } from '../shared/rules.js';
 import type { Command } from '../shared/types.js';
-import { isLive, maxWidthFor, playerFv, type RoomState } from './engine.js';
+import { isLive, maxWidthFor, nextQuoteAt, playerFv, type RoomState } from './engine.js';
 import type { RoomManager } from './manager.js';
 
 interface BotMemory {
@@ -11,7 +11,7 @@ interface BotMemory {
   noiseStage: number;
 }
 
-export function botDecision(room: RoomState, pid: string, noise: number, rand: () => number): Command | null {
+export function botDecision(room: RoomState, pid: string, noise: number, rand: () => number, now: number): Command | null {
   const r = room.round;
   if (!r || room.phase !== 'market' || room.pausedAt !== null || !r.participants.includes(pid)) return null;
   const role = r.roles[pid];
@@ -61,6 +61,11 @@ export function botDecision(room: RoomState, pid: string, noise: number, rand: (
   // Stale quotes elsewhere would drag this quote far from fair value; step away instead.
   if (Math.abs(bid - wanted) > width) return mine ? { kind: 'pullQuote' } : null;
   if (bid < 0) return null;
+  const allowed = nextQuoteAt(r, pid);
+  if (allowed !== null && now < allowed) {
+    // Cannot requote yet: step away if the current quote is badly off.
+    return mine && Math.abs((mine.bid + mine.ask) / 2 - mid) > width ? { kind: 'pullQuote' } : null;
+  }
   if (isLive(mine) && Math.abs((mine.bid + mine.ask) / 2 - (bid + ask) / 2) < 1.5 && rand() < 0.85) return null;
   return { kind: 'setQuote', bid, ask, size: 1 + Math.floor(rand() * 3) };
 }
@@ -82,7 +87,7 @@ export function startBots(manager: RoomManager): () => void {
         }
         if (now < m.nextAt) continue;
         m.nextAt = now + 1500 + Math.random() * 3500;
-        const cmd = botDecision(room, p.id, m.noise, Math.random);
+        const cmd = botDecision(room, p.id, m.noise, Math.random, now);
         if (cmd) void manager.command(room.id, { kind: 'player', playerId: p.id }, randomUUID(), cmd).catch(() => {});
       }
     }

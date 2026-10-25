@@ -9,8 +9,8 @@ export type Side = 'buy' | 'sell';
 export interface RoomConfig extends Durations {
   roundTypes: RoundType[];
   devMode: boolean;
-  /** Show each player their exact fair value and the public fair value. */
-  helpers: boolean;
+  /** Minimum ms between a player's quote posts. */
+  quoteCooldownMs: number;
 }
 
 export interface Quote {
@@ -119,6 +119,9 @@ export interface Round {
   activeMs: number | null;
   settlement: number | null;
   lastPrice: number | null;
+  quoteCooldownMs: number;
+  /** When each player last posted a quote (pulling does not reset it). */
+  lastQuoteAt: Record<string, number>;
 }
 
 export interface RoundResult {
@@ -135,7 +138,7 @@ export interface RoundResult {
 // ---- wire ----
 
 export type Command =
-  | { kind: 'setConfig'; roundTypes?: RoundType[]; briefingMs?: number; marketMs?: number; resultsMs?: number; helpers?: boolean }
+  | { kind: 'setConfig'; roundTypes?: RoundType[]; briefingMs?: number; marketMs?: number; resultsMs?: number; quoteCooldownMs?: number }
   | { kind: 'start' }
   | { kind: 'pause' }
   | { kind: 'resume' }
@@ -218,7 +221,9 @@ export interface Snapshot {
     position: number;
     cash: number;
     rebates: number;
+    /** Only revealed once the round settles: players work out fair value themselves. */
     fv: number | null;
+    nextQuoteAt: number | null;
     quote: Quote | null;
     uptimeMs: number;
     isInsider: boolean;

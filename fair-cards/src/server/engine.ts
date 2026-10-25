@@ -4,6 +4,7 @@ import { analyzeRound, type PlayerRoundReview } from '../shared/review.js';
 import {
   CONTRACT_SIZE,
   DEFAULT_DURATIONS,
+  DEFAULT_QUOTE_COOLDOWN_MS,
   DEFAULT_ROUND_TYPES,
   DURATION_BOUNDS,
   INSIDER_START_CARDS,
@@ -21,6 +22,7 @@ import {
   PRICE_MIN,
   PRIVATE_SCHEDULE,
   PUBLIC_SCHEDULE,
+  QUOTE_COOLDOWN_BOUNDS,
   ROUND_TYPE_IDS,
   SHOCK_FRACTIONS,
   SHOCK_JITTER,
@@ -83,7 +85,7 @@ export function newRoomState(args: { id: string; code: string; hostHash: string;
     hostHash: args.hostHash,
     revision: 1,
     createdAt: args.now,
-    config: { roundTypes: DEFAULT_ROUND_TYPES.slice(), ...DEFAULT_DURATIONS, devMode: args.devMode, helpers: true },
+    config: { roundTypes: DEFAULT_ROUND_TYPES.slice(), ...DEFAULT_DURATIONS, devMode: args.devMode, quoteCooldownMs: DEFAULT_QUOTE_COOLDOWN_MS },
     phase: 'lobby',
     phaseDeadline: null,
     pausedAt: null,
@@ -202,7 +204,15 @@ function createRound(room: RoomState, ctx: Ctx): Round {
     activeMs: null,
     settlement: null,
     lastPrice: null,
+    quoteCooldownMs: room.config.quoteCooldownMs ?? DEFAULT_QUOTE_COOLDOWN_MS,
+    lastQuoteAt: {},
   };
+}
+
+/** Earliest time this player may post a quote again. */
+export function nextQuoteAt(r: Round, pid: string): number | null {
+  const last = r.lastQuoteAt?.[pid];
+  return last === undefined ? null : last + (r.quoteCooldownMs ?? DEFAULT_QUOTE_COOLDOWN_MS);
 }
 
 function startBriefing(room: RoomState, ctx: Ctx): void {
@@ -426,7 +436,12 @@ export function applyCommand(room: RoomState, actor: Actor, cmd: Command, ctx: C
         if (!isInt(v) || v < lo || v > hi) throw new EngineError('bad_config', `That duration must be between ${lo / 1000} and ${hi / 1000} seconds.`);
         c[k] = v;
       }
-      if (cmd.helpers !== undefined) c.helpers = cmd.helpers === true;
+      if (cmd.quoteCooldownMs !== undefined) {
+        const v = cmd.quoteCooldownMs;
+        const [lo, hi] = QUOTE_COOLDOWN_BOUNDS;
+        if (!isInt(v) || v < lo || v > hi) throw new EngineError('bad_config', `Time between quote updates must be ${lo / 1000} to ${hi / 1000} seconds.`);
+        c.quoteCooldownMs = v;
+      }
       return {};
     }
     case 'start': {
@@ -533,7 +548,13 @@ export function applyCommand(room: RoomState, actor: Actor, cmd: Command, ctx: C
         if (oq.askSize > 0 && bid >= oq.ask) throw new EngineError('crosses', `Your bid ${bid} would cross ${who}'s ask ${oq.ask}. Buy from them instead, or bid lower.`);
         if (oq.bidSize > 0 && ask <= oq.bid) throw new EngineError('crosses', `Your ask ${ask} would cross ${who}'s bid ${oq.bid}. Sell to them instead, or ask higher.`);
       }
+      const allowedAt = nextQuoteAt(r, pid);
+      if (allowedAt !== null && ctx.now < allowedAt) {
+        const secs = Math.ceil((allowedAt - ctx.now) / 1000);
+        throw new EngineError('cooldown', `You can update your quote every ${Math.round(r.quoteCooldownMs / 1000)} s. Next update in ${secs} s.`);
+      }
       const fv = playerFv(r, pid);
+      (r.lastQuoteAt ??= {})[pid] = ctx.now;
       r.quotes[pid] = { id: ctx.newId(), bid, ask, bidSize: size, askSize: size, size, postedAt: ctx.now, fvAtPost: fv };
       r.decisions.push({ at: ctx.now, playerId: pid, kind: 'quote', bid, ask, size, fv, publicFv: publicFv(r), position: r.positions[pid] ?? 0 });
       touchUptime(room, pid, ctx.now);

@@ -15,7 +15,7 @@ function simulate(players: number, type: (typeof ROUND_TYPE_IDS)[number], seed: 
   const noise: Record<string, number> = Object.fromEntries(h.r.participants.map((p) => [p, (rand() * 2 - 1) * 4]));
   while (h.room.phase === 'market') {
     for (const pid of h.r.participants) {
-      const cmd = botDecision(h.room, pid, noise[pid], rand);
+      const cmd = botDecision(h.room, pid, noise[pid], rand, h.now);
       if (!cmd) continue;
       try {
         applyCommand(h.room, { kind: 'player', playerId: pid }, cmd, h.ctx());

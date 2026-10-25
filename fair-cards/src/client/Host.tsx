@@ -200,10 +200,21 @@ function LobbySetup({ s, client }: { s: Snapshot; client: GameClient }) {
         <button className="btn small" disabled={c.roundTypes.length >= MAX_ROUNDS} onClick={() => setTypes([...c.roundTypes, 'discovery'])}>
           Add a round
         </button>
-        <label className="row" style={{ color: 'inherit' }}>
-          <input type="checkbox" checked={c.helpers} onChange={(e) => client.command({ kind: 'setConfig', helpers: e.target.checked }, { toast: false })} />
-          Show players their exact fair value and the public fair value (recommended for first-timers)
-        </label>
+        <div className="row">
+          <label htmlFor="cool" style={{ margin: 0, flex: 1 }}>
+            Seconds between a player's quote updates
+          </label>
+          <input
+            id="cool"
+            type="number"
+            min={0}
+            max={60}
+            defaultValue={c.quoteCooldownMs / 1000}
+            style={{ width: 90 }}
+            onBlur={(e) => client.command({ kind: 'setConfig', quoteCooldownMs: Math.round(Number(e.target.value) * 1000) })}
+          />
+        </div>
+        <p className="small muted">Players never see fair values during the market; they work them out. The review after each round shows the exact numbers.</p>
         <details>
           <summary>Phase durations</summary>
           <div className="row" style={{ marginTop: 8 }}>

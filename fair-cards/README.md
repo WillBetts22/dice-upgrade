@@ -18,7 +18,7 @@ A live market-making game for 2 to 30 people. Everyone trades one contract whose
 
 Private cards are spread so each card is seen by roughly the same number of people, with the cards that stay hidden longest dealt first. Alone you know a little; together the room knows nearly everything.
 
-**Quoting.** Every player posts a two-sided quote: a bid (you buy at) and an ask (you sell at), at most 4 apart, 1 to 5 lots each side. Anyone can buy from your ask or sell to your bid. You can only trade with others while your own two-sided quote is live, so everyone is a market maker. A quote that would cross someone else's price is rejected: trade with them instead.
+**Quoting.** Every player posts a two-sided quote: a bid (you buy at) and an ask (you sell at), at most 4 apart, 1 to 5 lots each side. Anyone can buy from your ask or sell to your bid. You can only trade with others while your own two-sided quote is live, so everyone is a market maker. You can post a new quote at most once every 15 seconds (the host can set 0 to 60), so each quote is a considered estimate rather than a reflex; pulling a quote is always allowed. A quote that would cross someone else's price is rejected: trade with them instead.
 
 **Scoring.** Round P&L = cash + position x settlement. Positions are capped at 10 lots long or short and reset each round. Scores add up across rounds.
 
@@ -31,7 +31,7 @@ Private cards are spread so each card is seen by roughly the same number of peop
 | News shocks | Two surprise news events at random times change how the contract settles (face cards double, aces high, red cards void, +15, -20, or two extra hidden cards) | Public news moves prices at once |
 | Insider | One random player secretly starts with 5 private cards | Spotting informed flow |
 
-**Fair value helper.** By default players see their exact fair value (known cards plus each hidden card at the average of the unseen deck) and the public fair value. The host can turn this off for experienced groups; the review always uses the exact values.
+**No fair value is shown.** Players work out the fair value themselves from the cards they can see (a full deck totals 364, so each unseen card is worth on average what is left of the deck divided by the cards left). The projector shows trades only. The exact fair values appear in the review once the round settles. A host who is not also playing sees the public fair value on the host screen.
 
 ## Decision review
 
@@ -39,7 +39,7 @@ At the end of each round every player sees:
 
 - **Every trade** with its EV then (your fair value minus the price, times lots, signed, plus any rebate) and what it actually made at settlement. Fills on your resting quote are classed as earning the spread, a stale-quote pick-off (your fair value moved after you posted), or a mispriced quote.
 - **Quotes** that did not contain your own fair value, unless you were deliberately skewing to cut inventory.
-- **Stale quotes**: a reveal or shock moved your fair value outside your quote and you did not update within 15 seconds.
+- **Stale quotes**: a reveal or shock moved your fair value outside your quote and you did not pull or move it within 15 seconds.
 - **Missed edges**: right after new information, someone's quote was at least 3 coins through your fair value and you did not take it within 30 seconds.
 - **Inventory**: ending 8 or more lots long or short.
 

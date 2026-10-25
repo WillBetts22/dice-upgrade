@@ -2,7 +2,7 @@ import type { Snapshot } from '../shared/types.js';
 import { useNow } from './common.js';
 
 /** Trade prices against the public fair value (and the settlement once known). */
-export function PriceChart({ s, offset, height = 220, myFv }: { s: Snapshot; offset: number; height?: number; myFv?: number | null }) {
+export function PriceChart({ s, offset, height = 220 }: { s: Snapshot; offset: number; height?: number }) {
   const now = useNow(1000) + offset;
   const r = s.round;
   if (!r || r.startedAt === null || r.endsAt === null) return null;
@@ -15,7 +15,6 @@ export function PriceChart({ s, offset, height = 220, myFv }: { s: Snapshot; off
   const ys: number[] = r.chart.map((p) => p[1]);
   for (const p of r.publicFvSeries ?? []) ys.push(p[1]);
   if (r.settlement !== null) ys.push(r.settlement);
-  if (myFv != null) ys.push(myFv);
   if (!ys.length) ys.push(70);
   let lo = Math.min(...ys);
   let hi = Math.max(...ys);
@@ -59,7 +58,6 @@ export function PriceChart({ s, offset, height = 220, myFv }: { s: Snapshot; off
         ))}
         {fvPath && <path d={fvPath} fill="none" stroke="var(--muted)" strokeWidth={2} strokeDasharray="6 4" />}
         {r.settlement !== null && <line x1={pad.l} x2={W - pad.r} y1={y(r.settlement)} y2={y(r.settlement)} stroke="var(--high)" strokeWidth={2.5} />}
-        {myFv != null && r.settlement === null && <line x1={pad.l} x2={W - pad.r} y1={y(myFv)} y2={y(myFv)} stroke="var(--accent)" strokeWidth={1.5} strokeDasharray="2 3" />}
         {tradePath && <path d={tradePath} fill="none" stroke="var(--text)" strokeWidth={1.5} opacity={0.6} />}
         {r.chart.map((p, i) => (
           <circle key={i} cx={x(p[0])} cy={y(p[1])} r={2.6} fill="var(--text)" />
@@ -75,12 +73,6 @@ export function PriceChart({ s, offset, height = 220, myFv }: { s: Snapshot; off
           <span>
             <i style={{ background: 'var(--muted)' }} />
             public fair value
-          </span>
-        )}
-        {myFv != null && r.settlement === null && (
-          <span>
-            <i style={{ background: 'var(--accent)' }} />
-            your fair value
           </span>
         )}
         {r.settlement !== null && (

@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react';
 import { MAKER_WIDTH, MAX_QUOTE_SIZE, MAX_WIDTH, POSITION_LIMIT } from '../shared/rules.js';
 import type { QuoteView, Snapshot } from '../shared/types.js';
-import { f1, playerName } from './common.js';
+import { playerName, useNow } from './common.js';
 import type { GameClient } from './net.js';
 
 function canTrade(s: Snapshot): boolean {
@@ -11,11 +11,12 @@ function canTrade(s: Snapshot): boolean {
   return !!me.quote && me.quote.bidSize > 0 && me.quote.askSize > 0;
 }
 
-export function QuotePanel({ s, client }: { s: Snapshot; client: GameClient }) {
+export function QuotePanel({ s, client, offset }: { s: Snapshot; client: GameClient; offset: number }) {
   const me = s.me!;
   const width = me.role === 'maker' ? MAKER_WIDTH : MAX_WIDTH;
-  const fv = me.fv;
-  const seed = me.quote ? [me.quote.bid, me.quote.ask] : fv !== null ? [Math.round(fv) - Math.floor(width / 2), Math.round(fv) - Math.floor(width / 2) + width] : [68, 68 + width];
+  const now = useNow(250) + offset;
+  const waitMs = me.nextQuoteAt !== null ? Math.max(0, me.nextQuoteAt - now) : 0;
+  const seed = me.quote ? [me.quote.bid, me.quote.ask] : [70 - Math.floor(width / 2), 70 - Math.floor(width / 2) + width];
   const [bid, setBid] = useState(seed[0]);
   const [ask, setAsk] = useState(seed[1]);
   const [size, setSize] = useState(me.quote?.size ?? 2);
@@ -42,14 +43,6 @@ export function QuotePanel({ s, client }: { s: Snapshot; client: GameClient }) {
     setTouched(true);
     setBid((b) => b + d);
     setAsk((a) => a + d);
-  };
-  const center = () => {
-    if (fv === null) return;
-    setTouched(true);
-    const skew = Math.round(-0.3 * me.position);
-    const b = Math.round(fv) + skew - Math.floor(width / 2);
-    setBid(b);
-    setAsk(b + width);
   };
   const post = async (b = bid, a = ask) => {
     const r = await client.command({ kind: 'setQuote', bid: b, ask: a, size });
@@ -97,13 +90,8 @@ export function QuotePanel({ s, client }: { s: Snapshot; client: GameClient }) {
             +1
           </button>
         </div>
-        {fv !== null && (
-          <button className="btn" onClick={center} title="Centers on your fair value, shaded against your position">
-            Center on {f1(fv)}
-          </button>
-        )}
-        <button className="btn primary" disabled={disabled || tooWide} onClick={() => post()}>
-          {q ? 'Update quote' : 'Post quote'}
+        <button className="btn primary" disabled={disabled || tooWide || waitMs > 0} onClick={() => post()}>
+          {waitMs > 0 ? `Next update in ${Math.ceil(waitMs / 1000)} s` : q ? 'Update quote' : 'Post quote'}
         </button>
         {q && (
           <button className="btn ghost" disabled={disabled} onClick={() => client.command({ kind: 'pullQuote' })}>
@@ -112,7 +100,7 @@ export function QuotePanel({ s, client }: { s: Snapshot; client: GameClient }) {
         )}
       </div>
       <p className="small muted">
-        Width {ask - bid} of max {width}. Others can buy from your ask or sell to your bid. A quote that crosses someone else's price is rejected: trade with them instead.
+        Width {ask - bid} of max {width}. You can post a new quote once every {Math.round(s.config.quoteCooldownMs / 1000)} s, so think before you quote; pulling is always allowed. A quote that crosses someone else's price is rejected: trade with them instead.
       </p>
     </div>
   );

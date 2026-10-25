@@ -1,7 +1,7 @@
 import { POSITION_LIMIT, ROUND_TYPES } from '../shared/rules.js';
 import type { Snapshot } from '../shared/types.js';
 import { PriceChart } from './Chart.js';
-import { Card, ConnBanner, ContractCards, f1, playerName, ROLE_LABEL, RuleLine, roundTitle, ShockBanner, Standings, Toasts, TopBar, useClient, useNow } from './common.js';
+import { Card, ConnBanner, ContractCards, playerName, ROLE_LABEL, RuleLine, roundTitle, ShockBanner, Standings, Toasts, TopBar, useClient, useNow } from './common.js';
 import { Book, QuotePanel, Tape } from './Market.js';
 import { creds } from './net.js';
 import { RoundReview, SessionReport } from './Review.js';
@@ -42,12 +42,12 @@ export function PlayerPage({ code }: { code: string }) {
           <div className="grid2">
             <div className="stack">
               <InfoCard s={s} />
-              {s.me && <QuotePanel key={s.round.number} s={s} client={client} />}
+              {s.me && <QuotePanel key={s.round.number} s={s} client={client} offset={state.offset} />}
             </div>
             <div className="stack">
               <Book s={s} client={client} />
               <div className="card">
-                <PriceChart s={s} offset={state.offset} myFv={s.me?.fv} />
+                <PriceChart s={s} offset={state.offset} />
               </div>
               <Tape s={s} />
             </div>
@@ -115,7 +115,7 @@ function InfoCard({ s }: { s: Snapshot }) {
   const r = s.round!;
   const me = s.me;
   const pos = me?.position ?? 0;
-  const pnlAtFv = me && me.fv !== null ? me.cash + pos * me.fv : null;
+  const pnlAtLast = me && r.lastPrice !== null ? me.cash + pos * r.lastPrice : null;
   const now = useNow(1000);
   const uptimePct = me && r.startedAt ? Math.min(100, Math.round((me.uptimeMs / Math.max(1, Math.min(now, r.endsAt ?? now) - r.startedAt)) * 100)) : null;
   return (
@@ -141,18 +141,6 @@ function InfoCard({ s }: { s: Snapshot }) {
         </div>
       )}
       <div className="strip">
-        {me?.fv != null && (
-          <div className="stat">
-            <div className="k">Your fair value</div>
-            <div className="v">{f1(me.fv)}</div>
-          </div>
-        )}
-        {r.publicFv !== null && (
-          <div className="stat">
-            <div className="k">Public fair value</div>
-            <div className="v">{f1(r.publicFv)}</div>
-          </div>
-        )}
         <div className="stat">
           <div className="k">Last trade</div>
           <div className="v">{r.lastPrice ?? '-'}</div>
@@ -171,10 +159,10 @@ function InfoCard({ s }: { s: Snapshot }) {
             <div className="v">{me.cash}</div>
           </div>
         )}
-        {pnlAtFv !== null && (
+        {pnlAtLast !== null && (
           <div className="stat">
-            <div className="k">P&L at your FV</div>
-            <div className={`v ${pnlAtFv > 0 ? 'pos' : pnlAtFv < 0 ? 'neg' : ''}`}>{f1(pnlAtFv)}</div>
+            <div className="k">P&L at last trade</div>
+            <div className={`v ${pnlAtLast > 0 ? 'pos' : pnlAtLast < 0 ? 'neg' : ''}`}>{pnlAtLast}</div>
           </div>
         )}
         {me && me.role !== 'taker' && uptimePct !== null && (
@@ -184,11 +172,9 @@ function InfoCard({ s }: { s: Snapshot }) {
           </div>
         )}
       </div>
-      {me?.fv != null && (
-        <p className="small muted">
-          Fair value = known cards + each hidden card at the average of the cards you have not seen. Score = cash + position x settlement.
-        </p>
-      )}
+      <p className="small muted">
+        Work out your own fair value from the cards you can see. A full deck adds up to 364 (average 7 a card). Score = cash + position x settlement.
+      </p>
     </div>
   );
 }

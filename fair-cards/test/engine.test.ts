@@ -194,3 +194,36 @@ describe('quotes and trades', () => {
     expect(tick(h.room, h.ctx())).toBe(false);
   });
 });
+
+describe('quote cooldown and hidden fair value', () => {
+  it('limits how often a player can post a quote, but pulling is always allowed', async () => {
+    const { buildSnapshot } = await import('../src/server/view.js');
+    const h = new Harness(2, { cooldownMs: 15_000 });
+    h.open();
+    h.as('p0', { kind: 'setQuote', bid: 68, ask: 72, size: 1 });
+    expect(() => h.as('p0', { kind: 'setQuote', bid: 67, ask: 71, size: 1 })).toThrow(/Next update in 15 s/);
+    h.as('p0', { kind: 'pullQuote' });
+    h.now += 10_000;
+    expect(() => h.as('p0', { kind: 'setQuote', bid: 67, ask: 71, size: 1 })).toThrow(/Next update in 5 s/);
+    h.now += 5_000;
+    h.as('p0', { kind: 'setQuote', bid: 67, ask: 71, size: 1 });
+    const snap = buildSnapshot(h.room, { kind: 'player', playerId: 'p0' }, h.now, () => true);
+    expect(snap.me!.nextQuoteAt).toBe(h.now + 15_000);
+    // No fair values leave the server while the market is open.
+    expect(snap.me!.fv).toBeNull();
+    expect(snap.round!.publicFv).toBeNull();
+    expect(snap.round!.publicFvSeries).toBeNull();
+    expect(buildSnapshot(h.room, { kind: 'spectator' }, h.now, () => true).round!.publicFv).toBeNull();
+    h.advance(DEFAULT_DURATIONS.marketMs);
+    const done = buildSnapshot(h.room, { kind: 'player', playerId: 'p0' }, h.now, () => true);
+    expect(done.me!.fv).not.toBeNull();
+    expect(done.round!.publicFv).not.toBeNull();
+  });
+
+  it('rejects an out-of-range cooldown setting', () => {
+    const h = new Harness(2);
+    expect(() => h.host({ kind: 'setConfig', quoteCooldownMs: 120_000 })).toThrow(/0 to 60 seconds/);
+    h.host({ kind: 'setConfig', quoteCooldownMs: 5_000 });
+    expect(h.room.config.quoteCooldownMs).toBe(5_000);
+  });
+});

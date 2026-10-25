@@ -198,7 +198,7 @@ export function analyzeRound({ round: r, names, fvAtClose }: AnalyzeInput): Play
             evThen: null,
             evFinal: null,
             verdict: 'bad',
-            better: 'Update within a few seconds of new information, or pull the quote while you think.',
+            better: 'Pull or move your quote as soon as new information lands. Pulling is always allowed, even while you wait to repost.',
           });
         } else if (next) {
           items.push({ at: e.at, kind: 'quote', title: `Updated your quote ${Math.round(lag / 1000)} s after ${eventName(e, start)}`, detail: `Your fair value moved to ${f1(fv)} and you requoted quickly.`, evThen: null, evFinal: null, verdict: 'good' });

@@ -44,6 +44,9 @@ export const SHOCK_FRACTIONS = [0.37, 0.63];
 export const SHOCK_JITTER = 0.05;
 
 export const MAX_WIDTH = 4;
+/** Minimum time between a player's quote posts, so quoting is a considered decision. */
+export const DEFAULT_QUOTE_COOLDOWN_MS = 15_000;
+export const QUOTE_COOLDOWN_BOUNDS: [number, number] = [0, 60_000];
 export const MAKER_WIDTH = 2;
 export const MAX_QUOTE_SIZE = 5;
 export const POSITION_LIMIT = 10;
